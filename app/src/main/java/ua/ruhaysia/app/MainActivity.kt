@@ -2,6 +2,7 @@ package ua.ruhaysia.app
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.NotificationManager
 import android.app.TimePickerDialog
 import android.content.Intent
@@ -10,11 +11,14 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.InputFilter
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.EditText
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -192,7 +196,8 @@ class MainActivity : Activity() {
     private fun exerciseRow(parent: LinearLayout, ex: Ex) {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(0, dp(6), 0, dp(6))
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(2), 0, dp(2))
         }
         val box = CheckBox(this).apply {
             text = ex.title
@@ -209,19 +214,38 @@ class MainActivity : Activity() {
         }
         row.addView(box, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
 
-        val spinner = Spinner(this)
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, ex.goals.map { "$it" })
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        spinner.adapter = adapter
-        spinner.setSelection(ex.goals.indexOf(store.goal(ex)).let { if (it < 0) 0 else it })
-        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                store.setGoal(ex, ex.goals[pos])
+        val button = Button(this)
+        button.text = store.goal(ex).toString()
+        button.setOnClickListener {
+            val input = EditText(this).apply {
+                inputType = InputType.TYPE_CLASS_NUMBER
+                filters = arrayOf(InputFilter.LengthFilter(4))
+                setText(store.goal(ex).toString())
+                setSelection(text.length)
             }
-
-            override fun onNothingSelected(p: AdapterView<*>?) {}
+            val box2 = LinearLayout(this).apply {
+                setPadding(dp(24), dp(8), dp(24), 0)
+                addView(input, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ))
+            }
+            AlertDialog.Builder(this)
+                .setTitle(ex.title + ": скільки разів")
+                .setView(box2)
+                .setPositiveButton("Зберегти") { _, _ ->
+                    val n = input.text.toString().toIntOrNull()
+                    if (n == null || n < 1) {
+                        Toast.makeText(this, "Введи число від 1 до 9999", Toast.LENGTH_SHORT).show()
+                    } else {
+                        store.setGoal(ex, n)
+                        button.text = n.toString()
+                    }
+                }
+                .setNegativeButton("Скасувати", null)
+                .show()
         }
-        row.addView(spinner)
+        row.addView(button)
         parent.addView(row)
     }
 
@@ -261,7 +285,7 @@ class MainActivity : Activity() {
         timeRow(root, "Нагадувати до", { store.endMinutes }) { store.endMinutes = it }
 
         root.addView(label("Вправи", 18f, 20))
-        root.addView(label("Познач, які вправи хочеш робити, і скільки разів. " +
+        root.addView(label("Познач, які вправи хочеш робити. Натисни на число, щоб змінити кількість. " +
             "Нагадування закриє будь-яка одна з них.", 14f, 4).apply { alpha = 0.7f })
         for (ex in Ex.values()) exerciseRow(root, ex)
 
