@@ -39,6 +39,7 @@ class MainActivity : Activity() {
     private lateinit var toggle: Switch
     private lateinit var fixNotifications: Button
     private lateinit var fixFullScreen: Button
+    private lateinit var pauseButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,12 +53,19 @@ class MainActivity : Activity() {
     }
 
     private fun refresh() {
-        status.text = when {
-            !store.enabled -> "Нагадування вимкнено"
-            store.pending -> "На тебе чекає розминка!"
-            else -> "Наступне нагадування о " +
-                SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(store.nextAt))
+        val now = System.currentTimeMillis()
+        val sbStatus = StringBuilder(Reminder.statusText(this))
+        sbStatus.append("\nСьогодні: ").append(store.doneOn(Date())).append(" з ")
+            .append(store.dailyGoal).append(" · серія: ").append(store.streak()).append(" дн.")
+        if (store.lastSkipAt > 0L && now - store.lastSkipAt < 3 * 3600_000L) {
+            sbStatus.append("\nОстаннє нагадування пропущено о ")
+                .append(SimpleDateFormat("HH:mm", Locale.US).format(Date(store.lastSkipAt)))
+                .append(": ти й так пройшов ").append(store.lastSkipSteps).append(" кроків")
         }
+        status.text = sbStatus.toString()
+        pauseButton.text = if (Reminder.isPaused(store)) "Зняти паузу" else "Пауза"
+        pauseButton.isEnabled = store.enabled
+        MoveWidget.refresh(this)
 
         val uk = Locale("uk")
         val dayFmt = SimpleDateFormat("EEE dd.MM", uk)
@@ -102,8 +110,33 @@ class MainActivity : Activity() {
         refresh()
     }
 
+    private fun askPause() {
+        val names = arrayOf("30 хвилин", "1 година", "2 години", "До завтра")
+        AlertDialog.Builder(this)
+            .setTitle("Пауза: не нагадувати")
+            .setItems(names) { _, which ->
+                val now = System.currentTimeMillis()
+                if (which == 3) {
+                    val c = Calendar.getInstance().apply {
+                        add(Calendar.DAY_OF_YEAR, 1)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }
+                    Reminder.pause(this, c.timeInMillis, true)
+                } else {
+                    val minutes = intArrayOf(30, 60, 120)[which]
+                    Reminder.pause(this, now + minutes * 60_000L, false)
+                }
+                refresh()
+            }
+            .setNegativeButton("Скасувати", null)
+            .show()
+    }
+
     private fun onSettingChanged() {
-        if (store.enabled && !store.pending) Reminder.scheduleNext(this)
+        if (store.enabled && !store.pending && !Reminder.isPaused(store)) Reminder.scheduleNext(this)
         refresh()
     }
 
@@ -246,7 +279,7 @@ class MainActivity : Activity() {
         }
 
         root.addView(label("Рухайся", 32f).apply { setTextColor(getColor(R.color.accent)) })
-        status = label("", 16f, 6)
+        status = label("", 16f, 6).apply { setLineSpacing(dp(3).toFloat(), 1f) }
         root.addView(status)
 
         toggle = Switch(this).apply {
@@ -256,6 +289,7 @@ class MainActivity : Activity() {
             isChecked = store.enabled
             setOnCheckedChangeListener { _, on ->
                 store.enabled = on
+                store.pauseUntil = 0L
                 store.pending = false
                 store.snoozeUsed = false
                 if (on) {
@@ -289,6 +323,19 @@ class MainActivity : Activity() {
                 startActivity(Intent(this@MainActivity, ChallengeActivity::class.java))
             }
         })
+
+        pauseButton = Button(this).apply {
+            text = "Пауза"
+            setOnClickListener {
+                if (Reminder.isPaused(store)) {
+                    Reminder.resume(this@MainActivity)
+                    refresh()
+                } else {
+                    askPause()
+                }
+            }
+        }
+        root.addView(pauseButton)
 
         root.addView(Button(this).apply {
             text = "Налаштування"

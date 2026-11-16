@@ -30,7 +30,26 @@ object Sounds {
         return i
     }
 
-    fun playDone(ctx: Context) = play(ctx, DONE[pick(ctx, "done", DONE.size)])
+    /** Extra phrases found by file name, e.g. goal1.mp3, done_squats2.mp3; may be empty. */
+    private fun named(ctx: Context, prefix: String): List<Int> =
+        (1..9).map { ctx.resources.getIdentifier(prefix + it, "raw", ctx.packageName) }
+            .filter { it != 0 }
+
+    /**
+     * Phrase after a finished warm-up. Most special one wins: [special] ("streak" or
+     * "goal"), then one for this exercise, then a general one.
+     */
+    fun playDone(ctx: Context, ex: Ex?, special: String?) {
+        val options = listOfNotNull(special, ex?.let { "done_" + it.key })
+        for (prefix in options) {
+            val ids = named(ctx, prefix)
+            if (ids.isNotEmpty()) {
+                play(ctx, ids[pick(ctx, prefix, ids.size)])
+                return
+            }
+        }
+        play(ctx, DONE[pick(ctx, "done", DONE.size)])
+    }
 
     fun playSnooze(ctx: Context) = play(ctx, SNOOZE[pick(ctx, "snooze", SNOOZE.size)])
 

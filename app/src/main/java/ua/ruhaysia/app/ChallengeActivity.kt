@@ -21,6 +21,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
+import java.util.Date
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -302,19 +303,19 @@ class ChallengeActivity : Activity(), SensorEventListener {
     }
 
     private fun update() {
-        var reached = false
+        var reached: Ex? = null
         for (e in exercises) {
             val goal = store.goal(e)
             val n = counts[e.ordinal]
             texts[e]?.text = "${e.title}: ${minOf(n, goal)} / $goal"
             bars[e]?.max = goal
             bars[e]?.progress = minOf(n, goal)
-            if (n >= goal) reached = true
+            if (n >= goal && reached == null) reached = e
         }
-        if (!done && reached) complete()
+        if (!done && reached != null) complete(reached)
     }
 
-    private fun complete() {
+    private fun complete(ex: Ex) {
         done = true
         store.pending = false
         store.snoozeUsed = false
@@ -324,11 +325,21 @@ class ChallengeActivity : Activity(), SensorEventListener {
             if (n > 0) store.addAmountToday(e, n)
         }
         Reminder.hideNotification(this)
-        if (store.enabled) Reminder.scheduleNext(this)
+        if (store.enabled && !Reminder.isPaused(store)) Reminder.scheduleNext(this)
 
-        Sounds.playDone(this)
-        title.text = "Молодець!"
-        hint.text = "Розминку зараховано. Таймер запущено знову."
+        val today = store.doneOn(Date())
+        val goalHit = today == store.dailyGoal
+        val streak = store.streak()
+        val special = when {
+            goalHit && streak > 0 && streak % 7 == 0 -> "streak"
+            goalHit -> "goal"
+            else -> null
+        }
+        Sounds.playDone(this, ex, special)
+        title.text = if (goalHit) "Денну ціль виконано!" else "Молодець!"
+        hint.text = "Сьогодні: $today з ${store.dailyGoal}. Серія: $streak дн.\n" +
+            "Таймер запущено знову."
+        MoveWidget.refresh(this)
         snooze.visibility = View.GONE
         try {
             getSystemService(Vibrator::class.java)

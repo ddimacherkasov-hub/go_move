@@ -2,6 +2,7 @@ package ua.ruhaysia.app
 
 import android.content.Context
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -35,6 +36,59 @@ class Store(ctx: Context) {
     var appSound: Boolean
         get() = sp.getBoolean("appSound", true)
         set(v) = sp.edit().putBoolean("appSound", v).apply()
+
+    /** Skip a reminder if the user already walked enough during the interval. */
+    var smartSkip: Boolean
+        get() = sp.getBoolean("smartSkip", true)
+        set(v) = sp.edit().putBoolean("smartSkip", v).apply()
+
+    var skipSteps: Int
+        get() = sp.getInt("skipSteps", 200)
+        set(v) = sp.edit().putInt("skipSteps", v).apply()
+
+    /** Step counter value when the current sitting interval started; -1 if unknown. */
+    var stepBase: Float
+        get() = sp.getFloat("stepBase", -1f)
+        set(v) = sp.edit().putFloat("stepBase", v).apply()
+
+    var lastSkipAt: Long
+        get() = sp.getLong("lastSkipAt", 0L)
+        set(v) = sp.edit().putLong("lastSkipAt", v).apply()
+
+    var lastSkipSteps: Int
+        get() = sp.getInt("lastSkipSteps", 0)
+        set(v) = sp.edit().putInt("lastSkipSteps", v).apply()
+
+    /** day is Calendar.DAY_OF_WEEK: 1 is Sunday, 2 is Monday and so on. */
+    fun dayOn(day: Int): Boolean = sp.getBoolean("day_$day", true)
+
+    fun setDayOn(day: Int, v: Boolean) = sp.edit().putBoolean("day_$day", v).apply()
+
+    /** How many warm-ups a day the user aims for. */
+    var dailyGoal: Int
+        get() = sp.getInt("dailyGoal", 6)
+        set(v) = sp.edit().putInt("dailyGoal", v).apply()
+
+    var pauseUntil: Long
+        get() = sp.getLong("pauseUntil", 0L)
+        set(v) = sp.edit().putLong("pauseUntil", v).apply()
+
+    /**
+     * Days in a row with the daily goal reached. Today counts once the goal is reached
+     * and does not break the streak before that; switched-off weekdays are ignored.
+     */
+    fun streak(): Int {
+        val goal = dailyGoal
+        val c = Calendar.getInstance()
+        var n = 0
+        if (doneOn(c.time) >= goal) n++
+        for (i in 1..365) {
+            c.add(Calendar.DAY_OF_YEAR, -1)
+            if (!dayOn(c.get(Calendar.DAY_OF_WEEK))) continue
+            if (doneOn(c.time) >= goal) n++ else break
+        }
+        return n
+    }
 
     /** The next alarm is a manual test: show it even if reminders are off or it is late. */
     var testOnce: Boolean

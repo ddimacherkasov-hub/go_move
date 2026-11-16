@@ -2,6 +2,7 @@ package ua.ruhaysia.app
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -9,14 +10,20 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.text.InputFilter
+import android.text.InputType
+import android.view.Gravity
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.ToggleButton
+import java.util.Calendar
 
-/** Extra settings: sounds, test reminder, battery restrictions. */
+/** Extra settings: weekdays, smart skip, daily goal, sounds, test reminder, battery. */
 class SettingsActivity : Activity() {
     private lateinit var store: Store
     private lateinit var batteryText: TextView
@@ -59,6 +66,60 @@ class SettingsActivity : Activity() {
         })
     }
 
+    private fun reschedule() {
+        if (store.enabled && !store.pending && !Reminder.isPaused(store)) Reminder.scheduleNext(this)
+    }
+
+    private fun askSteps() {
+        if (!Steps.allowed(this) && Build.VERSION.SDK_INT >= 29) {
+            requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 2)
+        }
+    }
+
+    private fun numberRow(parent: LinearLayout, title: String, get: () -> Int, set: (Int) -> Unit) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        row.addView(
+            label(title, 16f),
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        )
+        val button = Button(this)
+        button.text = get().toString()
+        button.setOnClickListener {
+            val input = EditText(this).apply {
+                inputType = InputType.TYPE_CLASS_NUMBER
+                filters = arrayOf(InputFilter.LengthFilter(4))
+                setText(get().toString())
+                setSelection(text.length)
+            }
+            val box = LinearLayout(this).apply {
+                setPadding(dp(24), dp(8), dp(24), 0)
+                addView(input, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ))
+            }
+            AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(box)
+                .setPositiveButton("Зберегти") { _, _ ->
+                    val n = input.text.toString().toIntOrNull()
+                    if (n == null || n < 1) {
+                        Toast.makeText(this, "Введи число від 1 до 9999", Toast.LENGTH_SHORT).show()
+                    } else {
+                        set(n)
+                        button.text = n.toString()
+                    }
+                }
+                .setNegativeButton("Скасувати", null)
+                .show()
+        }
+        row.addView(button)
+        parent.addView(row)
+    }
+
     private fun askPermissions() {
         val need = ArrayList<String>()
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -79,6 +140,50 @@ class SettingsActivity : Activity() {
         root.addView(label("Якщо вимкнути голос нагадування, телефон лише вібруватиме.", 14f, 4, true))
         switchRow(root, "Голос нагадування", store.remindSound) { store.remindSound = it }
         switchRow(root, "Голос після вправи й відкладення", store.appSound) { store.appSound = it }
+
+        root.addView(label("Дні тижня", 18f, 24))
+        root.addView(label("У непозначені дні нагадувань не буде.", 14f, 4, true))
+        val daysRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val dayNames = listOf(
+            Calendar.MONDAY to "Пн", Calendar.TUESDAY to "Вт", Calendar.WEDNESDAY to "Ср",
+            Calendar.THURSDAY to "Чт", Calendar.FRIDAY to "Пт", Calendar.SATURDAY to "Сб",
+            Calendar.SUNDAY to "Нд"
+        )
+        for ((day, name) in dayNames) {
+            val t = ToggleButton(this).apply {
+                textOn = name
+                textOff = name
+                text = name
+                isChecked = store.dayOn(day)
+                minWidth = 0
+                minimumWidth = 0
+                setPadding(0, 0, 0, 0)
+            }
+            t.setOnCheckedChangeListener { _, on ->
+                if (!on && dayNames.none { it.first != day && store.dayOn(it.first) }) {
+                    t.isChecked = true
+                    Toast.makeText(this, "Має лишитися хоча б один день", Toast.LENGTH_SHORT).show()
+                } else {
+                    store.setDayOn(day, on)
+                    reschedule()
+                }
+            }
+            daysRow.addView(t, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        root.addView(daysRow)
+
+        root.addView(label("Розумний пропуск", 18f, 24))
+        root.addView(label("Якщо за інтервал ти й так походив із телефоном, нагадування " +
+            "не прийде, а відлік почнеться заново.", 14f, 4, true))
+        switchRow(root, "Пропускати, якщо я рухався", store.smartSkip) {
+            store.smartSkip = it
+            if (it) askSteps()
+        }
+        numberRow(root, "Скільки кроків досить", { store.skipSteps }) { store.skipSteps = it }
+
+        root.addView(label("Денна ціль", 18f, 24))
+        root.addView(label("День іде в серію, якщо зроблено стільки розминок.", 14f, 4, true))
+        numberRow(root, "Розминок на день", { store.dailyGoal }) { store.dailyGoal = it }
 
         root.addView(label("Перевірка", 18f, 24))
         root.addView(label("Нагадування прийде через хвилину, незалежно від інтервалу " +
