@@ -39,7 +39,7 @@ class MoveWidget : AppWidgetProvider() {
                     R.id.w_root,
                     PendingIntent.getActivity(
                         app, 2,
-                        Intent(app, ChallengeActivity::class.java)
+                        Intent(app, MainActivity::class.java)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                     )

@@ -51,6 +51,11 @@
         </activity-alias>
 
         <activity
+            android:name=".ExercisesActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".StatsActivity"
             android:exported="false"
             android:screenOrientation="portrait" />

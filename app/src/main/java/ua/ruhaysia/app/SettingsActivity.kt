@@ -44,6 +44,7 @@ class SettingsActivity : Activity() {
             if (free) "Обмеження батареї знято, застосунок може працювати у фоні."
             else "Телефон може зупиняти застосунок у фоні, і нагадування не прийдуть."
         batteryButton.isEnabled = !free
+        batteryButton.alpha = if (free) 0.5f else 1f
         batteryButton.text = if (free) "Обмеження вже знято" else "Зняти обмеження батареї"
     }
 

@@ -3,12 +3,15 @@ package ua.ruhaysia.app
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.CompoundButton
 import android.widget.TextView
+import android.widget.ToggleButton
 
 /** Colour themes and the app font. */
 const val THEME_GREEN = "green"
@@ -40,6 +43,9 @@ fun Context.applyLauncherIcon() {
     }
 }
 
+/** Tag for the main action button on a screen. */
+const val PRIMARY = "primary"
+
 object Ui {
     private var regular: Typeface? = null
     private var medium: Typeface? = null
@@ -70,6 +76,39 @@ object Ui {
                 view is Button || sp >= 17.5f -> medium
                 else -> regular
             }
+        }
+        val pink = ctx.isPink()
+        if (view is ToggleButton) {
+            // Weekday buttons: filled with the accent colour when switched on.
+            view.setBackgroundResource(if (pink) R.drawable.toggle_bg_pink else R.drawable.toggle_bg)
+            view.stateListAnimator = null
+            view.setTextColor(
+                ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(0xFF0F1418.toInt(), 0xFFFFFFFF.toInt())
+                )
+            )
+        } else if (view is Button && view !is CompoundButton) {
+            // Ordinary buttons: rounded, in the theme's tone; the main action is accent-filled.
+            val primary = view.tag == PRIMARY
+            view.setBackgroundResource(
+                when {
+                    primary && pink -> R.drawable.btn_primary_pink
+                    primary -> R.drawable.btn_primary
+                    pink -> R.drawable.btn_bg_pink
+                    else -> R.drawable.btn_bg
+                }
+            )
+            view.stateListAnimator = null
+            view.setTextColor(
+                ColorStateList(
+                    arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf()),
+                    intArrayOf(
+                        0x66FFFFFF,
+                        if (primary) 0xFF0F1418.toInt() else 0xFFFFFFFF.toInt()
+                    )
+                )
+            )
         }
         if (view is ViewGroup) {
             for (i in 0 until view.childCount) walk(view.getChildAt(i), ctx)

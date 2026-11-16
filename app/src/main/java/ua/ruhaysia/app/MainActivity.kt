@@ -103,6 +103,7 @@ class MainActivity : Activity() {
         status.text = sbStatus.toString()
         pauseButton.text = if (Reminder.isPaused(store)) "Зняти паузу" else "Пауза"
         pauseButton.isEnabled = store.enabled
+        pauseButton.alpha = if (store.enabled) 1f else 0.5f
         if (withWidget) MoveWidget.refresh(this)
 
         val nm = getSystemService(NotificationManager::class.java)
@@ -237,62 +238,6 @@ class MainActivity : Activity() {
         parent.addView(row)
     }
 
-    private fun exerciseRow(parent: LinearLayout, ex: Ex) {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(2), 0, dp(2))
-        }
-        val box = CheckBox(this).apply {
-            text = ex.title
-            textSize = 16f
-            isChecked = store.isOn(ex)
-        }
-        box.setOnCheckedChangeListener { _, on ->
-            if (!on && Ex.values().none { it != ex && store.isOn(it) }) {
-                box.isChecked = true
-                Toast.makeText(this, "Має лишитися хоча б одна вправа", Toast.LENGTH_SHORT).show()
-            } else {
-                store.setOn(ex, on)
-            }
-        }
-        row.addView(box, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-
-        val button = Button(this)
-        button.text = store.goal(ex).toString()
-        button.setOnClickListener {
-            val input = EditText(this).apply {
-                inputType = InputType.TYPE_CLASS_NUMBER
-                filters = arrayOf(InputFilter.LengthFilter(4))
-                setText(store.goal(ex).toString())
-                setSelection(text.length)
-            }
-            val box2 = LinearLayout(this).apply {
-                setPadding(dp(24), dp(8), dp(24), 0)
-                addView(input, LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ))
-            }
-            AlertDialog.Builder(this)
-                .setTitle(ex.title + ": скільки разів")
-                .setView(box2)
-                .setPositiveButton("Зберегти") { _, _ ->
-                    val n = input.text.toString().toIntOrNull()
-                    if (n == null || n < 1) {
-                        Toast.makeText(this, "Введи число від 1 до 9999", Toast.LENGTH_SHORT).show()
-                    } else {
-                        store.setGoal(ex, n)
-                        button.text = n.toString()
-                    }
-                }
-                .setNegativeButton("Скасувати", null)
-                .show()
-        }
-        row.addView(button)
-        parent.addView(row)
-    }
-
     private fun buildUi() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -300,7 +245,8 @@ class MainActivity : Activity() {
         }
 
         root.addView(label("Jaba Mover", 32f).apply { setTextColor(accent()) })
-        status = label("", 16f, 6).apply { setLineSpacing(dp(3).toFloat(), 1f) }
+        root.addView(label("Привіт, жабо!", 20f, 2))
+        status = label("", 16f, 14).apply { setLineSpacing(dp(3).toFloat(), 1f) }
         root.addView(status)
 
         toggle = Switch(this).apply {
@@ -330,12 +276,8 @@ class MainActivity : Activity() {
         timeRow(root, "Нагадувати з", { store.startMinutes }) { store.startMinutes = it }
         timeRow(root, "Нагадувати до", { store.endMinutes }) { store.endMinutes = it }
 
-        root.addView(label("Вправи", 18f, 20))
-        root.addView(label("Познач, які вправи хочеш робити. Натисни на число, щоб змінити кількість. " +
-            "Нагадування закриє будь-яка одна з них.", 14f, 4).apply { alpha = 0.7f })
-        for (ex in Ex.values()) exerciseRow(root, ex)
-
         startButton = Button(this).apply {
+            tag = PRIMARY
             text = "Розім'ятись зараз"
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -359,6 +301,13 @@ class MainActivity : Activity() {
             }
         }
         root.addView(pauseButton)
+
+        root.addView(Button(this).apply {
+            text = "Вправи"
+            setOnClickListener {
+                startActivity(Intent(this@MainActivity, ExercisesActivity::class.java))
+            }
+        })
 
         root.addView(Button(this).apply {
             text = "Статистика"
