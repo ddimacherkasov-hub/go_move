@@ -10,6 +10,11 @@ import java.util.Locale
 class Store(ctx: Context) {
     private val sp = ctx.applicationContext.getSharedPreferences("ruhaysia", Context.MODE_PRIVATE)
 
+    /** Colour theme: "green" or "pink". */
+    var theme: String
+        get() = sp.getString("theme", "green") ?: "green"
+        set(v) = sp.edit().putString("theme", v).apply()
+
     var enabled: Boolean
         get() = sp.getBoolean("enabled", false)
         set(v) = sp.edit().putBoolean("enabled", v).apply()

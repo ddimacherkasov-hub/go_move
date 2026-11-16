@@ -23,6 +23,7 @@ class StatsActivity : Activity() {
     private var allTime = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(themeRes())
         super.onCreate(savedInstanceState)
         store = Store(this)
         root = LinearLayout(this).apply {
@@ -85,7 +86,7 @@ class StatsActivity : Activity() {
             textSize = size
             setPadding(0, dp(top), 0, 0)
             setLineSpacing(dp(4).toFloat(), 1f)
-            if (accent) setTextColor(getColor(R.color.accent))
+            if (accent) setTextColor(accent())
             if (dim) alpha = 0.7f
         })
     }
@@ -232,5 +233,6 @@ class StatsActivity : Activity() {
             }
         }
         if (shown == 0) add("У цьому періоді розминок немає", 15f, 14, dim = true)
+        Ui.applyFont(root)
     }
 }

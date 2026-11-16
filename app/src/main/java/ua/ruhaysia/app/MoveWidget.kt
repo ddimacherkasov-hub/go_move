@@ -30,6 +30,11 @@ class MoveWidget : AppWidgetProvider() {
                     "Сьогодні: ${s.doneOn(Date())} з ${s.dailyGoal} · тиждень: " +
                         s.weekProgress().let { "${it.first} з ${it.second} дн." }
                 )
+                views.setTextColor(R.id.w_line1, app.accent())
+                views.setInt(
+                    R.id.w_root, "setBackgroundResource",
+                    if (app.isPink()) R.drawable.widget_bg_pink else R.drawable.widget_bg
+                )
                 views.setOnClickPendingIntent(
                     R.id.w_root,
                     PendingIntent.getActivity(

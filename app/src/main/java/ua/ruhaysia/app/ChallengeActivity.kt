@@ -70,6 +70,7 @@ class ChallengeActivity : Activity(), SensorEventListener {
     private val bars = HashMap<Ex, ProgressBar>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(themeRes())
         super.onCreate(savedInstanceState)
         store = Store(this)
         sm = getSystemService(SensorManager::class.java)
@@ -293,7 +294,7 @@ class ChallengeActivity : Activity(), SensorEventListener {
         for (e in exercises) {
             val on = e == active
             rows[e]?.alpha = if (on) 1f else 0.45f
-            texts[e]?.setTextColor(getColor(if (on) R.color.accent else android.R.color.white))
+            texts[e]?.setTextColor(if (on) accent() else getColor(android.R.color.white))
         }
         showHint()
         update()
@@ -374,7 +375,7 @@ class ChallengeActivity : Activity(), SensorEventListener {
         title = TextView(this).apply {
             text = "Час рухатись!"
             textSize = 34f
-            setTextColor(getColor(R.color.accent))
+            setTextColor(accent())
         }
         val sub = TextView(this).apply {
             text = if (exercises.size > 1) "Обери вправу (натисни на неї) і виконай до кінця."
@@ -394,7 +395,7 @@ class ChallengeActivity : Activity(), SensorEventListener {
             }
             val text = TextView(this).apply { textSize = 22f }
             val bar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-                progressTintList = ColorStateList.valueOf(getColor(R.color.accent))
+                progressTintList = ColorStateList.valueOf(accent())
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, dp(12)
                 ).apply { topMargin = dp(6) }
@@ -431,5 +432,6 @@ class ChallengeActivity : Activity(), SensorEventListener {
             isFillViewport = true
             addView(root)
         })
+        Ui.applyFont(root)
     }
 }

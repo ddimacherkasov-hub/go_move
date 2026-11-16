@@ -42,15 +42,23 @@ class MainActivity : Activity() {
     private lateinit var fixFullScreen: Button
     private lateinit var pauseButton: Button
     private lateinit var startButton: Button
+    private var shownTheme = THEME_GREEN
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(themeRes())
         super.onCreate(savedInstanceState)
         store = Store(this)
+        shownTheme = store.theme
         buildUi()
     }
 
     override fun onResume() {
         super.onResume()
+        if (shownTheme != store.theme) {
+            // The theme was changed in settings: rebuild the screen in new colours.
+            recreate()
+            return
+        }
         refresh()
         ticker.removeCallbacks(tick)
         ticker.postDelayed(tick, 1000L)
@@ -291,7 +299,7 @@ class MainActivity : Activity() {
             setPadding(dp(24), dp(32), dp(24), dp(32))
         }
 
-        root.addView(label("Рухайся", 32f).apply { setTextColor(getColor(R.color.accent)) })
+        root.addView(label("Рухайся", 32f).apply { setTextColor(accent()) })
         status = label("", 16f, 6).apply { setLineSpacing(dp(3).toFloat(), 1f) }
         root.addView(status)
 
@@ -401,5 +409,6 @@ class MainActivity : Activity() {
             fitsSystemWindows = true
             addView(root)
         })
+        Ui.applyFont(root)
     }
 }

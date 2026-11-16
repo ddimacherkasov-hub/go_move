@@ -5,26 +5,44 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
     android:gravity="center_vertical"
-    android:orientation="vertical"
-    android:paddingLeft="16dp"
-    android:paddingRight="16dp"
-    android:paddingTop="10dp"
-    android:paddingBottom="10dp">
+    android:orientation="horizontal"
+    android:paddingLeft="14dp"
+    android:paddingRight="14dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
 
-    <TextView
-        android:id="@+id/w_line1"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:maxLines="2"
-        android:textColor="#FF3DDC97"
-        android:textSize="15sp" />
+    <ImageView
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginRight="12dp"
+        android:contentDescription="Рухайся"
+        android:src="@drawable/ic_frog" />
 
-    <TextView
-        android:id="@+id/w_line2"
-        android:layout_width="match_parent"
+    <LinearLayout
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:maxLines="1"
-        android:textColor="#FFFFFFFF"
-        android:textSize="13sp" />
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/w_line1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="@font/rubik_medium"
+            android:maxLines="1"
+            android:textColor="#FF3DDC97"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/w_line2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:ellipsize="end"
+            android:fontFamily="@font/rubik_regular"
+            android:maxLines="1"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp" />
+    </LinearLayout>
 </LinearLayout>

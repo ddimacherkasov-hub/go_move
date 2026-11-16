@@ -30,6 +30,7 @@ class SettingsActivity : Activity() {
     private lateinit var batteryButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(themeRes())
         super.onCreate(savedInstanceState)
         store = Store(this)
         buildUi()
@@ -134,12 +135,31 @@ class SettingsActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(32), dp(24), dp(32))
         }
-        root.addView(label("Налаштування", 28f).apply { setTextColor(getColor(R.color.accent)) })
+        root.addView(label("Налаштування", 28f).apply { setTextColor(accent()) })
 
         root.addView(label("Звуки", 18f, 24))
         root.addView(label("Якщо вимкнути голос нагадування, телефон лише вібруватиме.", 14f, 4, true))
         switchRow(root, "Голос нагадування", store.remindSound) { store.remindSound = it }
         switchRow(root, "Голос після вправи й відкладення", store.appSound) { store.appSound = it }
+
+        root.addView(label("Тема", 18f, 24))
+        val themeRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        for ((id, name) in listOf(THEME_GREEN to "Зелена", THEME_PINK to "Рожева")) {
+            themeRow.addView(
+                Button(this).apply {
+                    text = if (store.theme == id) "✓ $name" else name
+                    setOnClickListener {
+                        if (store.theme != id) {
+                            store.theme = id
+                            MoveWidget.refresh(this@SettingsActivity)
+                            recreate()
+                        }
+                    }
+                },
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            )
+        }
+        root.addView(themeRow)
 
         root.addView(label("Дні тижня", 18f, 24))
         root.addView(label("У непозначені дні нагадувань не буде.", 14f, 4, true))
@@ -228,5 +248,6 @@ class SettingsActivity : Activity() {
             fitsSystemWindows = true
             addView(root)
         })
+        Ui.applyFont(root)
     }
 }

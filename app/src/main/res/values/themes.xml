@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Green theme -->
     <color name="bg">#0F1418</color>
     <color name="accent">#3DDC97</color>
-    <color name="ic_bg">#12332A</color>
+    <!-- Pink theme -->
+    <color name="bg_pink">#1A1016</color>
+    <color name="accent_pink">#FF7EB6</color>
 
     <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
         <item name="android:colorPrimary">@color/bg</item>
@@ -11,5 +14,15 @@
         <item name="android:windowBackground">@color/bg</item>
         <item name="android:statusBarColor">@color/bg</item>
         <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:fontFamily">@font/rubik</item>
+    </style>
+
+    <style name="AppTheme.Pink">
+        <item name="android:colorPrimary">@color/bg_pink</item>
+        <item name="android:colorPrimaryDark">@color/bg_pink</item>
+        <item name="android:colorAccent">@color/accent_pink</item>
+        <item name="android:windowBackground">@color/bg_pink</item>
+        <item name="android:statusBarColor">@color/bg_pink</item>
+        <item name="android:navigationBarColor">@color/bg_pink</item>
     </style>
 </resources>

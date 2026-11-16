@@ -187,7 +187,7 @@ object Reminder {
         )
         val n = Notification.Builder(ctx, CHANNEL_PREFIX + "snooze")
             .setSmallIcon(R.drawable.ic_notif)
-            .setColor(ctx.getColor(R.color.accent))
+            .setColor(ctx.accent())
             .setContentTitle("Розминку відкладено")
             .setContentText("Дід повернеться о " + timeText(until))
             .setWhen(until)
@@ -413,7 +413,7 @@ object Reminder {
         )
         val n = Notification.Builder(ctx, channelId)
             .setSmallIcon(R.drawable.ic_notif)
-            .setColor(ctx.getColor(R.color.accent))
+            .setColor(ctx.accent())
             .setContentTitle(if (nag) "Досі сидиш? Час рухатись!" else "Час рухатись!")
             .setContentText(
                 "На вибір: " + s.enabledExercises().joinToString(", ") { it.title.lowercase() }
