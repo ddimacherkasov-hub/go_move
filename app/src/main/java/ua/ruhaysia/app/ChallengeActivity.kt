@@ -319,6 +319,7 @@ class ChallengeActivity : Activity(), SensorEventListener {
         done = true
         store.pending = false
         store.snoozeUsed = false
+        store.snoozeUntil = 0L
         store.addDoneToday()
         for (e in exercises) {
             val n = counts[e.ordinal]
@@ -411,10 +412,8 @@ class ChallengeActivity : Activity(), SensorEventListener {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(28) }
             setOnClickListener {
-                store.snoozeUsed = true
                 Sounds.playSnooze(this@ChallengeActivity)
-                Reminder.hideNotification(this@ChallengeActivity)
-                Reminder.scheduleNag(this@ChallengeActivity, 10)
+                Reminder.snooze(this@ChallengeActivity)
                 finish()
             }
         }

@@ -10,6 +10,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.text.InputFilter
 import android.text.InputType
@@ -39,6 +41,7 @@ class MainActivity : Activity() {
     private lateinit var fixNotifications: Button
     private lateinit var fixFullScreen: Button
     private lateinit var pauseButton: Button
+    private lateinit var startButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,11 +52,37 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refresh()
+        ticker.removeCallbacks(tick)
+        ticker.postDelayed(tick, 1000L)
     }
 
-    private fun refresh() {
+    private val ticker = Handler(Looper.getMainLooper())
+    private val tick = object : Runnable {
+        override fun run() {
+            // Live countdown only while a reminder is snoozed.
+            if (Reminder.isSnoozed(store) || wasSnoozed) refresh(false)
+            ticker.postDelayed(this, 1000L)
+        }
+    }
+    private var wasSnoozed = false
+
+    override fun onPause() {
+        ticker.removeCallbacks(tick)
+        super.onPause()
+    }
+
+    private fun refresh(withWidget: Boolean = true) {
         val now = System.currentTimeMillis()
-        val sbStatus = StringBuilder(Reminder.statusText(this))
+        val snoozed = Reminder.isSnoozed(store)
+        wasSnoozed = snoozed
+        val first = if (snoozed) {
+            val left = ((store.snoozeUntil - now) / 1000L).coerceAtLeast(0L)
+            String.format(Locale.US, "Відкладено, лишилось %d:%02d", left / 60, left % 60)
+        } else {
+            Reminder.statusText(this)
+        }
+        startButton.text = if (snoozed) "Почати розминку зараз" else "Розім'ятись зараз"
+        val sbStatus = StringBuilder(first)
         sbStatus.append("\nСьогодні: ").append(store.doneOn(Date())).append(" з ")
             .append(store.dailyGoal)
         val (goalDays, activeDays) = store.weekProgress()
@@ -66,7 +95,7 @@ class MainActivity : Activity() {
         status.text = sbStatus.toString()
         pauseButton.text = if (Reminder.isPaused(store)) "Зняти паузу" else "Пауза"
         pauseButton.isEnabled = store.enabled
-        MoveWidget.refresh(this)
+        if (withWidget) MoveWidget.refresh(this)
 
         val nm = getSystemService(NotificationManager::class.java)
         fixNotifications.visibility =
@@ -274,6 +303,7 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, on ->
                 store.enabled = on
                 store.pauseUntil = 0L
+                store.snoozeUntil = 0L
                 store.pending = false
                 store.snoozeUsed = false
                 if (on) {
@@ -297,7 +327,7 @@ class MainActivity : Activity() {
             "Нагадування закриє будь-яка одна з них.", 14f, 4).apply { alpha = 0.7f })
         for (ex in Ex.values()) exerciseRow(root, ex)
 
-        root.addView(Button(this).apply {
+        startButton = Button(this).apply {
             text = "Розім'ятись зараз"
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -306,7 +336,8 @@ class MainActivity : Activity() {
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, ChallengeActivity::class.java))
             }
-        })
+        }
+        root.addView(startButton)
 
         pauseButton = Button(this).apply {
             text = "Пауза"

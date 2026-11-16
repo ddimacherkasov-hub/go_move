@@ -10,6 +10,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.drawable.Icon
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -157,12 +158,64 @@ object Reminder {
         setAlarm(ctx, System.currentTimeMillis() + minutes * 60_000L)
     }
 
+    const val SNOOZE_MINUTES = 10
+
+    fun isSnoozed(s: Store): Boolean = s.pending && System.currentTimeMillis() < s.snoozeUntil
+
+    /**
+     * Put the waiting reminder off. A quiet notification with a countdown stays in the
+     * shade, with a button to start the warm-up earlier.
+     */
+    fun snooze(ctx: Context) {
+        val s = Store(ctx)
+        val until = System.currentTimeMillis() + SNOOZE_MINUTES * 60_000L
+        s.snoozeUsed = true
+        s.snoozeUntil = until
+        setAlarm(ctx, until)
+        showSnoozeNotification(ctx, until)
+        MoveWidget.refresh(ctx)
+    }
+
+    private fun showSnoozeNotification(ctx: Context, until: Long) {
+        val nm = ctx.getSystemService(NotificationManager::class.java)
+        ensureChannels(ctx, nm)
+        val open = PendingIntent.getActivity(
+            ctx, 1,
+            Intent(ctx, ChallengeActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val n = Notification.Builder(ctx, CHANNEL_PREFIX + "snooze")
+            .setSmallIcon(R.drawable.ic_notif)
+            .setColor(ctx.getColor(R.color.accent))
+            .setContentTitle("Розминку відкладено")
+            .setContentText("Дід повернеться о " + timeText(until))
+            .setWhen(until)
+            .setShowWhen(true)
+            .setUsesChronometer(true)
+            .setChronometerCountDown(true)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setOnlyAlertOnce(true)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setContentIntent(open)
+            .addAction(
+                Notification.Action.Builder(
+                    Icon.createWithResource(ctx, R.drawable.ic_notif), "Почати зараз", open
+                ).build()
+            )
+            .build()
+        nm.cancel(NOTIF_ID)
+        nm.notify(NOTIF_ID, n)
+    }
+
     /** Manual check: a reminder in one minute, whatever the settings say. */
     fun scheduleTest(ctx: Context) {
         val s = Store(ctx)
         s.testOnce = true
         s.pending = false
         s.snoozeUsed = false
+        s.snoozeUntil = 0L
         hideNotification(ctx)
         scheduleAt(ctx, System.currentTimeMillis() + 60_000L)
     }
@@ -176,6 +229,7 @@ object Reminder {
         val s = Store(ctx)
         s.pending = false
         s.snoozeUsed = false
+        s.snoozeUntil = 0L
         s.testOnce = false
         hideNotification(ctx)
         s.pauseUntil = until
@@ -209,6 +263,7 @@ object Reminder {
         return when {
             !s.enabled -> "Нагадування вимкнено"
             now < s.pauseUntil -> "Пауза до " + timeText(s.pauseUntil)
+            isSnoozed(s) -> "Відкладено до " + timeText(s.snoozeUntil)
             s.pending -> "На тебе чекає розминка!"
             else -> "Наступне нагадування: " + timeText(s.nextAt)
         }
@@ -244,6 +299,7 @@ object Reminder {
         if (!test && !isActive(s, now)) {
             s.pending = false
             s.snoozeUsed = false
+            s.snoozeUntil = 0L
             hideNotification(ctx)
             scheduleNext(ctx)
             then()
@@ -270,7 +326,9 @@ object Reminder {
     }
 
     private fun remind(ctx: Context, nag: Boolean) {
-        Store(ctx).pending = true
+        val s = Store(ctx)
+        s.pending = true
+        s.snoozeUntil = 0L
         showNotification(ctx, nag)
         scheduleNag(ctx)
         MoveWidget.refresh(ctx)
@@ -315,6 +373,16 @@ object Reminder {
             if (!old.id.startsWith(CHANNEL_PREFIX)) nm.deleteNotificationChannel(old.id)
         }
         nm.createNotificationChannel(channel(CHANNEL_PREFIX + "vibro", "Тільки вібрація", null))
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_PREFIX + "snooze", "Відкладена розминка", NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Тихий відлік до повернення відкладеного нагадування"
+                setSound(null, null)
+                enableVibration(false)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
+        )
         Sounds.REMIND.forEachIndexed { i, n ->
             nm.createNotificationChannel(
                 channel(CHANNEL_PREFIX + n, "Нагадування, фраза ${i + 1}", Sounds.uri(ctx, n))

@@ -156,6 +156,11 @@ class Store(ctx: Context) {
         get() = sp.getBoolean("snoozeUsed", false)
         set(v) = sp.edit().putBoolean("snoozeUsed", v).apply()
 
+    /** When a snoozed reminder comes back; 0 if nothing is snoozed. */
+    var snoozeUntil: Long
+        get() = sp.getLong("snoozeUntil", 0L)
+        set(v) = sp.edit().putLong("snoozeUntil", v).apply()
+
     var nextAt: Long
         get() = sp.getLong("nextAt", 0L)
         set(v) = sp.edit().putLong("nextAt", v).apply()
