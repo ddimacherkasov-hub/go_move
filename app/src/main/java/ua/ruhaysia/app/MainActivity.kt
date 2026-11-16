@@ -10,7 +10,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
 import android.provider.Settings
 import android.text.InputFilter
 import android.text.InputType
@@ -40,7 +39,6 @@ class MainActivity : Activity() {
     private lateinit var toggle: Switch
     private lateinit var fixNotifications: Button
     private lateinit var fixFullScreen: Button
-    private lateinit var fixBattery: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,9 +77,6 @@ class MainActivity : Activity() {
         stats.text = sb.toString().trimEnd()
 
         val nm = getSystemService(NotificationManager::class.java)
-        val pm = getSystemService(PowerManager::class.java)
-        fixBattery.visibility =
-            if (pm.isIgnoringBatteryOptimizations(packageName)) View.GONE else View.VISIBLE
         fixNotifications.visibility =
             if (nm.areNotificationsEnabled()) View.GONE else View.VISIBLE
         fixFullScreen.visibility =
@@ -188,16 +183,6 @@ class MainActivity : Activity() {
         parent.addView(row)
     }
 
-    private fun switchRow(parent: LinearLayout, title: String, on: Boolean, set: (Boolean) -> Unit) {
-        parent.addView(Switch(this).apply {
-            text = title
-            textSize = 16f
-            setPadding(0, dp(10), 0, dp(10))
-            isChecked = on
-            setOnCheckedChangeListener { _, v -> set(v) }
-        })
-    }
-
     private fun exerciseRow(parent: LinearLayout, ex: Ex) {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -294,12 +279,6 @@ class MainActivity : Activity() {
             "Нагадування закриє будь-яка одна з них.", 14f, 4).apply { alpha = 0.7f })
         for (ex in Ex.values()) exerciseRow(root, ex)
 
-        root.addView(label("Звуки", 18f, 20))
-        root.addView(label("Якщо вимкнути голос нагадування, телефон лише вібруватиме.", 14f, 4)
-            .apply { alpha = 0.7f })
-        switchRow(root, "Голос нагадування", store.remindSound) { store.remindSound = it }
-        switchRow(root, "Голос після вправи й відкладення", store.appSound) { store.appSound = it }
-
         root.addView(Button(this).apply {
             text = "Розім'ятись зараз"
             layoutParams = LinearLayout.LayoutParams(
@@ -312,39 +291,11 @@ class MainActivity : Activity() {
         })
 
         root.addView(Button(this).apply {
-            text = "Тест: нагадати через 1 хвилину"
+            text = "Налаштування"
             setOnClickListener {
-                askPermissions()
-                Reminder.scheduleTest(this@MainActivity)
-                Toast.makeText(
-                    this@MainActivity,
-                    "Заблокуй телефон і почекай хвилину",
-                    Toast.LENGTH_LONG
-                ).show()
-                refresh()
+                startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
             }
         })
-
-        fixBattery = Button(this).apply {
-            text = "Зняти обмеження батареї"
-            visibility = View.GONE
-            setOnClickListener {
-                try {
-                    startActivity(
-                        Intent(
-                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                            Uri.parse("package:$packageName")
-                        )
-                    )
-                } catch (e: Exception) {
-                    try {
-                        startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-                    } catch (ignored: Exception) {
-                    }
-                }
-            }
-        }
-        root.addView(fixBattery)
 
         fixNotifications = Button(this).apply {
             text = "Увімкнути сповіщення (вимкнені)"

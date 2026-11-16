@@ -29,6 +29,11 @@
         </activity>
 
         <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".ChallengeActivity"
             android:exported="false"
             android:excludeFromRecents="true"
