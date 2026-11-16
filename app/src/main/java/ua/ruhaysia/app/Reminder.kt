@@ -84,6 +84,16 @@ object Reminder {
         setAlarm(ctx, System.currentTimeMillis() + minutes * 60_000L)
     }
 
+    /** Manual check: a reminder in one minute, whatever the settings say. */
+    fun scheduleTest(ctx: Context) {
+        val s = Store(ctx)
+        s.testOnce = true
+        s.pending = false
+        s.snoozeUsed = false
+        hideNotification(ctx)
+        scheduleAt(ctx, System.currentTimeMillis() + 60_000L)
+    }
+
     fun cancelAll(ctx: Context) {
         ctx.getSystemService(AlarmManager::class.java).cancel(alarmIntent(ctx))
         hideNotification(ctx)
@@ -96,8 +106,10 @@ object Reminder {
     /** The alarm went off: show the reminder, or skip it outside active hours. */
     fun fire(ctx: Context) {
         val s = Store(ctx)
-        if (!s.enabled) return
-        if (!inWindow(System.currentTimeMillis(), s.startMinutes, s.endMinutes)) {
+        val test = s.testOnce
+        if (test) s.testOnce = false
+        if (!s.enabled && !test) return
+        if (!test && !inWindow(System.currentTimeMillis(), s.startMinutes, s.endMinutes)) {
             s.pending = false
             s.snoozeUsed = false
             hideNotification(ctx)

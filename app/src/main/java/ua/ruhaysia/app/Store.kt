@@ -36,6 +36,11 @@ class Store(ctx: Context) {
         get() = sp.getBoolean("appSound", true)
         set(v) = sp.edit().putBoolean("appSound", v).apply()
 
+    /** The next alarm is a manual test: show it even if reminders are off or it is late. */
+    var testOnce: Boolean
+        get() = sp.getBoolean("testOnce", false)
+        set(v) = sp.edit().putBoolean("testOnce", v).apply()
+
     fun lastSound(kind: String): Int = sp.getInt("lastSound_$kind", -1)
 
     fun setLastSound(kind: String, i: Int) = sp.edit().putInt("lastSound_$kind", i).apply()

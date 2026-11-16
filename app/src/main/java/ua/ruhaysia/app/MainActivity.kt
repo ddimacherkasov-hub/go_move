@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.text.InputFilter
 import android.text.InputType
@@ -39,6 +40,7 @@ class MainActivity : Activity() {
     private lateinit var toggle: Switch
     private lateinit var fixNotifications: Button
     private lateinit var fixFullScreen: Button
+    private lateinit var fixBattery: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,6 +79,9 @@ class MainActivity : Activity() {
         stats.text = sb.toString().trimEnd()
 
         val nm = getSystemService(NotificationManager::class.java)
+        val pm = getSystemService(PowerManager::class.java)
+        fixBattery.visibility =
+            if (pm.isIgnoringBatteryOptimizations(packageName)) View.GONE else View.VISIBLE
         fixNotifications.visibility =
             if (nm.areNotificationsEnabled()) View.GONE else View.VISIBLE
         fixFullScreen.visibility =
@@ -305,6 +310,41 @@ class MainActivity : Activity() {
                 startActivity(Intent(this@MainActivity, ChallengeActivity::class.java))
             }
         })
+
+        root.addView(Button(this).apply {
+            text = "Тест: нагадати через 1 хвилину"
+            setOnClickListener {
+                askPermissions()
+                Reminder.scheduleTest(this@MainActivity)
+                Toast.makeText(
+                    this@MainActivity,
+                    "Заблокуй телефон і почекай хвилину",
+                    Toast.LENGTH_LONG
+                ).show()
+                refresh()
+            }
+        })
+
+        fixBattery = Button(this).apply {
+            text = "Зняти обмеження батареї"
+            visibility = View.GONE
+            setOnClickListener {
+                try {
+                    startActivity(
+                        Intent(
+                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                            Uri.parse("package:$packageName")
+                        )
+                    )
+                } catch (e: Exception) {
+                    try {
+                        startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                    } catch (ignored: Exception) {
+                    }
+                }
+            }
+        }
+        root.addView(fixBattery)
 
         fixNotifications = Button(this).apply {
             text = "Увімкнути сповіщення (вимкнені)"
