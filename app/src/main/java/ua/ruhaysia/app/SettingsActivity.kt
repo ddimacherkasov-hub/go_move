@@ -151,6 +151,7 @@ class SettingsActivity : Activity() {
                     setOnClickListener {
                         if (store.theme != id) {
                             store.theme = id
+                            applyLauncherIcon()
                             MoveWidget.refresh(this@SettingsActivity)
                             recreate()
                         }

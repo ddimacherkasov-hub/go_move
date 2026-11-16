@@ -299,7 +299,7 @@ class MainActivity : Activity() {
             setPadding(dp(24), dp(32), dp(24), dp(32))
         }
 
-        root.addView(label("Рухайся", 32f).apply { setTextColor(accent()) })
+        root.addView(label("Jaba Mover", 32f).apply { setTextColor(accent()) })
         status = label("", 16f, 6).apply { setLineSpacing(dp(3).toFloat(), 1f) }
         root.addView(status)
 

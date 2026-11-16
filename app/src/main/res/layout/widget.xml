@@ -15,7 +15,7 @@
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:layout_marginRight="12dp"
-        android:contentDescription="Рухайся"
+        android:contentDescription="Jaba Mover"
         android:src="@drawable/ic_frog" />
 
     <LinearLayout

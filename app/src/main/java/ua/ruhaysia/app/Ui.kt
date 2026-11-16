@@ -1,6 +1,8 @@
 package ua.ruhaysia.app
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Typeface
 import android.util.TypedValue
 import android.view.View
@@ -18,6 +20,25 @@ fun Context.themeRes(): Int = if (isPink()) R.style.AppTheme_Pink else R.style.A
 
 /** Accent colour of the chosen theme. */
 fun Context.accent(): Int = getColor(if (isPink()) R.color.accent_pink else R.color.accent)
+
+/** Show the launcher icon that matches the theme: pink background for the pink theme. */
+fun Context.applyLauncherIcon() {
+    try {
+        val pink = isPink()
+        val on = PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+        val off = PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        val green = ComponentName(packageName, "ua.ruhaysia.app.LauncherGreen")
+        val rose = ComponentName(packageName, "ua.ruhaysia.app.LauncherPink")
+        // Switch the new one on first, so there is always one launcher entry.
+        packageManager.setComponentEnabledSetting(
+            if (pink) rose else green, on, PackageManager.DONT_KILL_APP
+        )
+        packageManager.setComponentEnabledSetting(
+            if (pink) green else rose, off, PackageManager.DONT_KILL_APP
+        )
+    } catch (ignored: Exception) {
+    }
+}
 
 object Ui {
     private var regular: Typeface? = null
