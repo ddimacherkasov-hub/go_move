@@ -180,6 +180,25 @@ class Store(ctx: Context) {
         sp.edit().putInt(k, sp.getInt(k, 0) + n).apply()
     }
 
+    /**
+     * Journal of warm-ups for a day, one per line: "HH:mm|steps=120,squats=15".
+     * Warm-ups made before this journal existed are not in it.
+     */
+    fun sessionsOn(day: Date): List<String> =
+        (sp.getString("log_" + KEY.format(day), "") ?: "").split("\n").filter { it.isNotBlank() }
+
+    fun addSessionToday(time: String, amounts: Map<Ex, Int>) {
+        val k = "log_" + KEY.format(Date())
+        val line = time + "|" + amounts.entries.joinToString(",") { it.key.key + "=" + it.value }
+        val old = sp.getString(k, "") ?: ""
+        sp.edit().putString(k, if (old.isEmpty()) line else old + "\n" + line).apply()
+    }
+
+    /** The earliest day anything was recorded, or null. */
+    fun firstDay(): Date? =
+        sp.all.keys.filter { it.startsWith("done_") }.map { it.removePrefix("done_") }.minOrNull()
+            ?.let { try { KEY.parse(it) } catch (e: Exception) { null } }
+
     companion object {
         private val KEY = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     }

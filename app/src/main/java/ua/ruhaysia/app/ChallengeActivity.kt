@@ -21,7 +21,9 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -321,10 +323,15 @@ class ChallengeActivity : Activity(), SensorEventListener {
         store.snoozeUsed = false
         store.snoozeUntil = 0L
         store.addDoneToday()
+        val made = LinkedHashMap<Ex, Int>()
         for (e in exercises) {
             val n = counts[e.ordinal]
-            if (n > 0) store.addAmountToday(e, n)
+            if (n > 0) {
+                store.addAmountToday(e, n)
+                made[e] = n
+            }
         }
+        store.addSessionToday(SimpleDateFormat("HH:mm", Locale.US).format(Date()), made)
         Reminder.hideNotification(this)
         if (store.enabled && !Reminder.isPaused(store)) Reminder.scheduleNext(this)
 
