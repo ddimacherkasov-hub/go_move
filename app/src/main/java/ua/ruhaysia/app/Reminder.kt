@@ -8,13 +8,14 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
 import android.os.Build
 import java.util.Calendar
 
 /** Scheduling of reminders and the "time to move" notification. */
 object Reminder {
     const val ACTION_REMIND = "ua.ruhaysia.app.REMIND"
-    private const val CHANNEL = "move_v1"
+    private const val CHANNEL_PREFIX = "move_"
     private const val NOTIF_ID = 1
     private const val NAG_MINUTES = 5
 
@@ -116,9 +117,31 @@ object Reminder {
     private fun showNotification(ctx: Context) {
         val s = Store(ctx)
         val nm = ctx.getSystemService(NotificationManager::class.java)
+        val channelId = CHANNEL_PREFIX + "s" + s.soundVersion
+        for (old in nm.notificationChannels) {
+            if (old.id.startsWith(CHANNEL_PREFIX) && old.id != channelId) {
+                nm.deleteNotificationChannel(old.id)
+            }
+        }
         val ch = NotificationChannel(
-            CHANNEL, "Нагадування рухатись", NotificationManager.IMPORTANCE_HIGH
+            channelId, "Нагадування рухатись", NotificationManager.IMPORTANCE_HIGH
         ).apply {
+            if (Sounds.has(ctx, Sounds.REMIND)) {
+                val uri = Sounds.uri(Sounds.REMIND, s.soundVersion)
+                try {
+                    ctx.grantUriPermission(
+                        "com.android.systemui", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (ignored: Exception) {
+                }
+                setSound(
+                    uri,
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+            }
             description = "Сигнал, що час встати з-за комп'ютера"
             enableVibration(true)
             vibrationPattern = longArrayOf(0, 400, 200, 400, 200, 400)
@@ -132,7 +155,7 @@ object Reminder {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val n = Notification.Builder(ctx, CHANNEL)
+        val n = Notification.Builder(ctx, channelId)
             .setSmallIcon(R.drawable.ic_notif)
             .setColor(ctx.getColor(R.color.accent))
             .setContentTitle("Час рухатись!")

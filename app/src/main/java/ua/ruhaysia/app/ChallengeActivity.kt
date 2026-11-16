@@ -326,6 +326,7 @@ class ChallengeActivity : Activity(), SensorEventListener {
         Reminder.hideNotification(this)
         if (store.enabled) Reminder.scheduleNext(this)
 
+        Sounds.play(this, Sounds.DONE)
         title.text = "Молодець!"
         hint.text = "Розминку зараховано. Таймер запущено знову."
         snooze.visibility = View.GONE

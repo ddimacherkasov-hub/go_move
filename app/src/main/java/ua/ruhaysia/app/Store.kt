@@ -50,6 +50,16 @@ class Store(ctx: Context) {
         get() = sp.getLong("nextAt", 0L)
         set(v) = sp.edit().putLong("nextAt", v).apply()
 
+    /** Grows on every sound change: a notification channel cannot change its sound. */
+    var soundVersion: Int
+        get() = sp.getInt("soundVersion", 0)
+        set(v) = sp.edit().putInt("soundVersion", v).apply()
+
+    fun soundName(kind: String): String? = sp.getString("soundName_$kind", null)
+
+    fun setSoundName(kind: String, name: String?) =
+        sp.edit().putString("soundName_$kind", name).apply()
+
     fun doneOn(day: Date): Int = sp.getInt("done_" + KEY.format(day), 0)
 
     fun addDoneToday() {
