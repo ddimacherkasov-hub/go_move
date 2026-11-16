@@ -25,13 +25,17 @@ class Store(ctx: Context) {
         get() = sp.getInt("endHour", 21)
         set(v) = sp.edit().putInt("endHour", v).apply()
 
-    var stepsGoal: Int
-        get() = sp.getInt("stepsGoal", 100)
-        set(v) = sp.edit().putInt("stepsGoal", v).apply()
+    fun goal(ex: Ex): Int = sp.getInt(ex.key + "Goal", ex.defaultGoal)
 
-    var squatsGoal: Int
-        get() = sp.getInt("squatsGoal", 15)
-        set(v) = sp.edit().putInt("squatsGoal", v).apply()
+    fun setGoal(ex: Ex, v: Int) = sp.edit().putInt(ex.key + "Goal", v).apply()
+
+    fun isOn(ex: Ex): Boolean = sp.getBoolean("on_" + ex.key, true)
+
+    fun setOn(ex: Ex, v: Boolean) = sp.edit().putBoolean("on_" + ex.key, v).apply()
+
+    /** Exercises the user has chosen; never empty. */
+    fun enabledExercises(): List<Ex> =
+        Ex.values().filter { isOn(it) }.ifEmpty { listOf(Ex.STEPS) }
 
     /** A reminder has fired and the warm-up has not been done yet. */
     var pending: Boolean
@@ -51,6 +55,14 @@ class Store(ctx: Context) {
     fun addDoneToday() {
         val k = "done_" + KEY.format(Date())
         sp.edit().putInt(k, sp.getInt(k, 0) + 1).apply()
+    }
+
+    /** How much of an exercise was done on that day, over all warm-ups. */
+    fun amountOn(day: Date, ex: Ex): Int = sp.getInt("ex_" + KEY.format(day) + "_" + ex.key, 0)
+
+    fun addAmountToday(ex: Ex, n: Int) {
+        val k = "ex_" + KEY.format(Date()) + "_" + ex.key
+        sp.edit().putInt(k, sp.getInt(k, 0) + n).apply()
     }
 
     companion object {

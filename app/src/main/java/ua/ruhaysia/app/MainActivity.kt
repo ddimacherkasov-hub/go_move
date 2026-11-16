@@ -13,11 +13,13 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
+import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -58,7 +60,12 @@ class MainActivity : Activity() {
         for (i in 0 until 7) {
             val n = store.doneOn(c.time)
             sb.append(if (i == 0) "Сьогодні" else dayFmt.format(c.time))
-                .append(" — ").append(n).append('\n')
+                .append(" — розминок: ").append(n).append('\n')
+            val parts = Ex.values()
+                .map { it to store.amountOn(c.time, it) }
+                .filter { it.second > 0 }
+                .joinToString(" · ") { "${it.first.title.lowercase()} ${it.second}" }
+            if (parts.isNotEmpty()) sb.append("      ").append(parts).append('\n')
             c.add(Calendar.DAY_OF_YEAR, -1)
         }
         stats.text = sb.toString().trimEnd()
@@ -142,6 +149,42 @@ class MainActivity : Activity() {
         parent.addView(row)
     }
 
+    private fun exerciseRow(parent: LinearLayout, ex: Ex) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(6), 0, dp(6))
+        }
+        val box = CheckBox(this).apply {
+            text = ex.title
+            textSize = 16f
+            isChecked = store.isOn(ex)
+        }
+        box.setOnCheckedChangeListener { _, on ->
+            if (!on && Ex.values().none { it != ex && store.isOn(it) }) {
+                box.isChecked = true
+                Toast.makeText(this, "Має лишитися хоча б одна вправа", Toast.LENGTH_SHORT).show()
+            } else {
+                store.setOn(ex, on)
+            }
+        }
+        row.addView(box, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+        val spinner = Spinner(this)
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, ex.goals.map { "$it" })
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinner.adapter = adapter
+        spinner.setSelection(ex.goals.indexOf(store.goal(ex)).let { if (it < 0) 0 else it })
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                store.setGoal(ex, ex.goals[pos])
+            }
+
+            override fun onNothingSelected(p: AdapterView<*>?) {}
+        }
+        row.addView(spinner)
+        parent.addView(row)
+    }
+
     private fun buildUi() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -182,10 +225,11 @@ class MainActivity : Activity() {
         picker(root, "Активні години: до", hours, hourText, store.endHour) {
             store.endHour = it
         }
-        picker(root, "Кроків для зарахування", listOf(50, 100, 150, 200, 300, 500),
-            { "$it" }, store.stepsGoal) { store.stepsGoal = it }
-        picker(root, "Присідань для зарахування", listOf(10, 15, 20, 25, 30),
-            { "$it" }, store.squatsGoal) { store.squatsGoal = it }
+
+        root.addView(label("Вправи", 18f, 20))
+        root.addView(label("Познач, які вправи хочеш робити, і скільки разів. " +
+            "Нагадування закриє будь-яка одна з них.", 14f, 4).apply { alpha = 0.7f })
+        for (ex in Ex.values()) exerciseRow(root, ex)
 
         root.addView(Button(this).apply {
             text = "Розім'ятись зараз"
@@ -229,7 +273,7 @@ class MainActivity : Activity() {
         }
         root.addView(fixFullScreen)
 
-        root.addView(label("Розминок за останні 7 днів", 18f, 28))
+        root.addView(label("Статистика за 7 днів", 18f, 28))
         stats = label("", 15f, 8).apply { setLineSpacing(dp(4).toFloat(), 1f) }
         root.addView(stats)
 

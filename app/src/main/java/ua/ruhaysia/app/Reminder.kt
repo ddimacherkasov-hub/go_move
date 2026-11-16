@@ -136,7 +136,9 @@ object Reminder {
             .setSmallIcon(R.drawable.ic_notif)
             .setColor(ctx.getColor(R.color.accent))
             .setContentTitle("Час рухатись!")
-            .setContentText("Пройди ${s.stepsGoal} кроків або зроби ${s.squatsGoal} присідань")
+            .setContentText(
+                "На вибір: " + s.enabledExercises().joinToString(", ") { it.title.lowercase() }
+            )
             .setCategory(Notification.CATEGORY_ALARM)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true)
