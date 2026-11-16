@@ -9,13 +9,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.net.Uri
 import android.os.Build
 import java.util.Calendar
 
 /** Scheduling of reminders and the "time to move" notification. */
 object Reminder {
     const val ACTION_REMIND = "ua.ruhaysia.app.REMIND"
-    private const val CHANNEL_PREFIX = "move_"
+    private const val CHANNEL_PREFIX = "mv3_"
     private const val NOTIF_ID = 1
     private const val NAG_MINUTES = 5
 
@@ -38,12 +39,14 @@ object Reminder {
         }
     }
 
+    /** start and end are minutes from midnight; the window may cross midnight. */
     fun inWindow(t: Long, start: Int, end: Int): Boolean {
-        val h = Calendar.getInstance().apply { timeInMillis = t }.get(Calendar.HOUR_OF_DAY)
+        val c = Calendar.getInstance().apply { timeInMillis = t }
+        val m = c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE)
         return when {
             start == end -> true
-            start < end -> h in start until end
-            else -> h >= start || h < end
+            start < end -> m in start until end
+            else -> m >= start || m < end
         }
     }
 
@@ -52,8 +55,8 @@ object Reminder {
         if (inWindow(t, start, end)) return t
         val c = Calendar.getInstance().apply {
             timeInMillis = t
-            set(Calendar.HOUR_OF_DAY, start)
-            set(Calendar.MINUTE, 0)
+            set(Calendar.HOUR_OF_DAY, start / 60)
+            set(Calendar.MINUTE, start % 60)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }
@@ -65,7 +68,7 @@ object Reminder {
     fun scheduleNext(ctx: Context) {
         val s = Store(ctx)
         val at = adjustToWindow(
-            System.currentTimeMillis() + s.intervalMin * 60_000L, s.startHour, s.endHour
+            System.currentTimeMillis() + s.intervalMin * 60_000L, s.startMinutes, s.endMinutes
         )
         s.nextAt = at
         setAlarm(ctx, at)
@@ -94,15 +97,16 @@ object Reminder {
     fun fire(ctx: Context) {
         val s = Store(ctx)
         if (!s.enabled) return
-        if (!inWindow(System.currentTimeMillis(), s.startHour, s.endHour)) {
+        if (!inWindow(System.currentTimeMillis(), s.startMinutes, s.endMinutes)) {
             s.pending = false
             s.snoozeUsed = false
             hideNotification(ctx)
             scheduleNext(ctx)
             return
         }
+        val nag = s.pending
         s.pending = true
-        showNotification(ctx)
+        showNotification(ctx, nag)
         scheduleNag(ctx)
     }
 
@@ -114,40 +118,51 @@ object Reminder {
         else fire(ctx)
     }
 
-    private fun showNotification(ctx: Context) {
-        val s = Store(ctx)
-        val nm = ctx.getSystemService(NotificationManager::class.java)
-        val channelId = CHANNEL_PREFIX + "s" + s.soundVersion
-        for (old in nm.notificationChannels) {
-            if (old.id.startsWith(CHANNEL_PREFIX) && old.id != channelId) {
-                nm.deleteNotificationChannel(old.id)
-            }
-        }
-        val ch = NotificationChannel(
-            channelId, "Нагадування рухатись", NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            if (Sounds.has(ctx, Sounds.REMIND)) {
-                val uri = Sounds.uri(Sounds.REMIND, s.soundVersion)
-                try {
-                    ctx.grantUriPermission(
-                        "com.android.systemui", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-                } catch (ignored: Exception) {
-                }
-                setSound(
-                    uri,
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-            }
+    private fun channel(id: String, name: String, sound: Uri?): NotificationChannel =
+        NotificationChannel(id, name, NotificationManager.IMPORTANCE_HIGH).apply {
             description = "Сигнал, що час встати з-за комп'ютера"
             enableVibration(true)
             vibrationPattern = longArrayOf(0, 400, 200, 400, 200, 400)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setSound(
+                sound,
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
         }
-        nm.createNotificationChannel(ch)
+
+    /**
+     * A channel's sound cannot be changed later, so every phrase has its own channel,
+     * plus one silent channel that only vibrates.
+     */
+    private fun ensureChannels(ctx: Context, nm: NotificationManager) {
+        for (old in nm.notificationChannels) {
+            if (!old.id.startsWith(CHANNEL_PREFIX)) nm.deleteNotificationChannel(old.id)
+        }
+        nm.createNotificationChannel(channel(CHANNEL_PREFIX + "vibro", "Тільки вібрація", null))
+        Sounds.REMIND.forEachIndexed { i, n ->
+            nm.createNotificationChannel(
+                channel(CHANNEL_PREFIX + n, "Нагадування, фраза ${i + 1}", Sounds.uri(ctx, n))
+            )
+        }
+        Sounds.NAG.forEachIndexed { i, n ->
+            nm.createNotificationChannel(
+                channel(CHANNEL_PREFIX + n, "Повторне нагадування, фраза ${i + 1}", Sounds.uri(ctx, n))
+            )
+        }
+    }
+
+    private fun showNotification(ctx: Context, nag: Boolean) {
+        val s = Store(ctx)
+        val nm = ctx.getSystemService(NotificationManager::class.java)
+        ensureChannels(ctx, nm)
+        val channelId = CHANNEL_PREFIX + when {
+            !s.remindSound -> "vibro"
+            nag -> Sounds.NAG[Sounds.pick(ctx, "nag", Sounds.NAG.size)]
+            else -> Sounds.REMIND[Sounds.pick(ctx, "remind", Sounds.REMIND.size)]
+        }
 
         val open = PendingIntent.getActivity(
             ctx, 1,
@@ -158,7 +173,7 @@ object Reminder {
         val n = Notification.Builder(ctx, channelId)
             .setSmallIcon(R.drawable.ic_notif)
             .setColor(ctx.getColor(R.color.accent))
-            .setContentTitle("Час рухатись!")
+            .setContentTitle(if (nag) "Досі сидиш? Час рухатись!" else "Час рухатись!")
             .setContentText(
                 "На вибір: " + s.enabledExercises().joinToString(", ") { it.title.lowercase() }
             )
@@ -169,6 +184,8 @@ object Reminder {
             .setContentIntent(open)
             .setFullScreenIntent(open, true)
             .build()
+        // Remove the old one first so the new phrase is played on a repeated reminder.
+        nm.cancel(NOTIF_ID)
         nm.notify(NOTIF_ID, n)
     }
 }

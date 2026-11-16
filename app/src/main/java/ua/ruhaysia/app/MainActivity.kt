@@ -3,12 +3,14 @@ package ua.ruhaysia.app
 import android.Manifest
 import android.app.Activity
 import android.app.NotificationManager
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.Gravity
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
@@ -25,9 +27,6 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-private const val PICK_REMIND = 10
-private const val PICK_DONE = 11
-
 /** Settings, status and statistics. */
 class MainActivity : Activity() {
     private lateinit var store: Store
@@ -36,7 +35,6 @@ class MainActivity : Activity() {
     private lateinit var toggle: Switch
     private lateinit var fixNotifications: Button
     private lateinit var fixFullScreen: Button
-    private val soundLabels = HashMap<String, () -> Unit>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -153,69 +151,42 @@ class MainActivity : Activity() {
         parent.addView(row)
     }
 
-    private fun soundRow(parent: LinearLayout, kind: String, title: String, none: String, code: Int) {
-        val name = TextView(this).apply {
-            textSize = 15f
-            setPadding(0, dp(14), 0, dp(2))
+    private fun timeRow(parent: LinearLayout, title: String, get: () -> Int, set: (Int) -> Unit) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(4), 0, dp(4))
         }
-        fun show() {
-            name.text = title + ": " + (if (Sounds.has(this, kind)) store.soundName(kind) ?: "свій звук" else none)
+        row.addView(
+            TextView(this).apply {
+                text = title
+                textSize = 16f
+            },
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        )
+        val fmt = { m: Int -> String.format(Locale.US, "%02d:%02d", m / 60, m % 60) }
+        val button = Button(this)
+        button.text = fmt(get())
+        button.setOnClickListener {
+            val now = get()
+            TimePickerDialog(this, { _, h, min ->
+                set(h * 60 + min)
+                button.text = fmt(get())
+                onSettingChanged()
+            }, now / 60, now % 60, true).show()
         }
-        show()
-        soundLabels[kind] = { show() }
-        parent.addView(name)
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        row.addView(Button(this).apply {
-            text = "Обрати файл"
-            setOnClickListener {
-                try {
-                    startActivityForResult(
-                        Intent(Intent.ACTION_GET_CONTENT)
-                            .setType("audio/*")
-                            .addCategory(Intent.CATEGORY_OPENABLE),
-                        code
-                    )
-                } catch (e: Exception) {
-                    Toast.makeText(this@MainActivity, "Не знайшов програму для вибору файлів", Toast.LENGTH_SHORT).show()
-                }
-            }
-        })
-        row.addView(Button(this).apply {
-            text = "Прослухати"
-            setOnClickListener { Sounds.play(this@MainActivity, kind) }
-        })
-        row.addView(Button(this).apply {
-            text = "Скинути"
-            setOnClickListener {
-                Sounds.stop()
-                Sounds.clear(this@MainActivity, kind)
-                store.setSoundName(kind, null)
-                store.soundVersion = store.soundVersion + 1
-                show()
-            }
-        })
+        row.addView(button)
         parent.addView(row)
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        val kind = when (requestCode) {
-            PICK_REMIND -> Sounds.REMIND
-            PICK_DONE -> Sounds.DONE
-            else -> return
-        }
-        val uri = data?.data
-        if (resultCode != RESULT_OK || uri == null) return
-        val name = Sounds.import(this, kind, uri)
-        if (name == null) {
-            Toast.makeText(this, "Не вдалося прочитати файл", Toast.LENGTH_SHORT).show()
-            store.setSoundName(kind, null)
-        } else {
-            store.setSoundName(kind, name)
-            Sounds.play(this, kind)
-        }
-        store.soundVersion = store.soundVersion + 1
-        soundLabels[kind]?.invoke()
+    private fun switchRow(parent: LinearLayout, title: String, on: Boolean, set: (Boolean) -> Unit) {
+        parent.addView(Switch(this).apply {
+            text = title
+            textSize = 16f
+            setPadding(0, dp(10), 0, dp(10))
+            isChecked = on
+            setOnCheckedChangeListener { _, v -> set(v) }
+        })
     }
 
     private fun exerciseRow(parent: LinearLayout, ex: Ex) {
@@ -284,16 +255,10 @@ class MainActivity : Activity() {
         }
         root.addView(toggle)
 
-        val hours = (0..23).toList()
-        val hourText = { h: Int -> String.format(Locale.US, "%02d:00", h) }
         picker(root, "Нагадувати кожні", listOf(30, 45, 60, 90, 120),
             { "$it хв" }, store.intervalMin) { store.intervalMin = it }
-        picker(root, "Активні години: з", hours, hourText, store.startHour) {
-            store.startHour = it
-        }
-        picker(root, "Активні години: до", hours, hourText, store.endHour) {
-            store.endHour = it
-        }
+        timeRow(root, "Нагадувати з", { store.startMinutes }) { store.startMinutes = it }
+        timeRow(root, "Нагадувати до", { store.endMinutes }) { store.endMinutes = it }
 
         root.addView(label("Вправи", 18f, 20))
         root.addView(label("Познач, які вправи хочеш робити, і скільки разів. " +
@@ -301,10 +266,10 @@ class MainActivity : Activity() {
         for (ex in Ex.values()) exerciseRow(root, ex)
 
         root.addView(label("Звуки", 18f, 20))
-        root.addView(label("Можна обрати свій mp3 або інший аудіофайл із телефона.", 14f, 4)
+        root.addView(label("Якщо вимкнути голос нагадування, телефон лише вібруватиме.", 14f, 4)
             .apply { alpha = 0.7f })
-        soundRow(root, Sounds.REMIND, "Нагадування", "стандартний звук", PICK_REMIND)
-        soundRow(root, Sounds.DONE, "Вправу завершено", "без звуку", PICK_DONE)
+        switchRow(root, "Голос нагадування", store.remindSound) { store.remindSound = it }
+        switchRow(root, "Голос після вправи й відкладення", store.appSound) { store.appSound = it }
 
         root.addView(Button(this).apply {
             text = "Розім'ятись зараз"

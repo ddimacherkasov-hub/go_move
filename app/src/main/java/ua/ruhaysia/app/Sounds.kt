@@ -1,63 +1,54 @@
 package ua.ruhaysia.app
 
-import android.content.ContentProvider
-import android.content.ContentValues
 import android.content.Context
-import android.database.Cursor
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
-import android.os.ParcelFileDescriptor
-import android.provider.OpenableColumns
-import java.io.File
-import java.io.FileNotFoundException
 
-/** The user's own sounds. A picked file is copied into the app's private storage. */
+/** Voice phrases built into the app. Each event has several; one is picked at random. */
 object Sounds {
-    const val REMIND = "remind"
-    const val DONE = "done"
-    private const val AUTHORITY = "ua.ruhaysia.app.sounds"
+    /** Played by the system as the notification sound (file names in res/raw). */
+    val REMIND = listOf("remind1", "remind2", "remind3")
+    val NAG = listOf("nag1", "nag2", "nag3")
+
+    /** Played by the app itself. */
+    private val DONE = intArrayOf(R.raw.done1, R.raw.done2, R.raw.done3)
+    private val SNOOZE = intArrayOf(R.raw.snooze1, R.raw.snooze2, R.raw.snooze3)
+
     private var player: MediaPlayer? = null
 
-    fun file(ctx: Context, kind: String) = File(ctx.filesDir, "sound_$kind")
+    fun uri(ctx: Context, name: String): Uri =
+        Uri.parse("android.resource://" + ctx.packageName + "/raw/" + name)
 
-    fun has(ctx: Context, kind: String) = file(ctx, kind).length() > 0L
-
-    /** Address the system uses to read the reminder sound. */
-    fun uri(kind: String, version: Int): Uri =
-        Uri.parse("content://$AUTHORITY/$kind?v=$version")
-
-    /** Copy the picked audio file; returns its display name, or null on failure. */
-    fun import(ctx: Context, kind: String, src: Uri): String? {
-        return try {
-            val input = ctx.contentResolver.openInputStream(src) ?: return null
-            input.use { i -> file(ctx, kind).outputStream().use { o -> i.copyTo(o) } }
-            var name = "свій звук"
-            ctx.contentResolver.query(src, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-                ?.use { c -> if (c.moveToFirst()) c.getString(0)?.let { name = it } }
-            name
-        } catch (e: Exception) {
-            file(ctx, kind).delete()
-            null
-        }
+    /** Random index that is not the same as the previous one for this event. */
+    fun pick(ctx: Context, kind: String, size: Int): Int {
+        val s = Store(ctx)
+        val last = s.lastSound(kind)
+        var i = (0 until size).random()
+        if (size > 1 && i == last) i = (i + 1) % size
+        s.setLastSound(kind, i)
+        return i
     }
 
-    fun clear(ctx: Context, kind: String) {
-        file(ctx, kind).delete()
-    }
+    fun playDone(ctx: Context) = play(ctx, DONE[pick(ctx, "done", DONE.size)])
 
-    fun play(ctx: Context, kind: String) {
-        if (!has(ctx, kind)) return
+    fun playSnooze(ctx: Context) = play(ctx, SNOOZE[pick(ctx, "snooze", SNOOZE.size)])
+
+    private fun play(ctx: Context, resId: Int) {
+        if (!Store(ctx).appSound) return
         try {
-            stop()
+            player?.release()
+            player = null
             val p = MediaPlayer()
             p.setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
             )
-            p.setDataSource(file(ctx, kind).absolutePath)
+            val afd = ctx.applicationContext.resources.openRawResourceFd(resId)
+            p.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+            afd.close()
             p.setOnCompletionListener {
                 it.release()
                 if (player === it) player = null
@@ -68,43 +59,4 @@ object Sounds {
         } catch (ignored: Exception) {
         }
     }
-
-    fun stop() {
-        try {
-            player?.release()
-        } catch (ignored: Exception) {
-        }
-        player = null
-    }
-}
-
-/** Lets the system notification player read the two sound files, read-only. */
-class SoundProvider : ContentProvider() {
-    override fun onCreate() = true
-
-    override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
-        val kind = uri.lastPathSegment
-        val ctx = context
-        if (ctx == null || (kind != Sounds.REMIND && kind != Sounds.DONE)) {
-            throw FileNotFoundException()
-        }
-        val f = Sounds.file(ctx, kind)
-        if (!f.exists()) throw FileNotFoundException()
-        return ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY)
-    }
-
-    override fun getType(uri: Uri): String = "audio/mpeg"
-
-    override fun query(
-        uri: Uri, projection: Array<out String>?, selection: String?,
-        selectionArgs: Array<out String>?, sortOrder: String?
-    ): Cursor? = null
-
-    override fun insert(uri: Uri, values: ContentValues?): Uri? = null
-
-    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?) = 0
-
-    override fun update(
-        uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?
-    ) = 0
 }

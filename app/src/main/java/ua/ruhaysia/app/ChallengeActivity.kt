@@ -326,7 +326,7 @@ class ChallengeActivity : Activity(), SensorEventListener {
         Reminder.hideNotification(this)
         if (store.enabled) Reminder.scheduleNext(this)
 
-        Sounds.play(this, Sounds.DONE)
+        Sounds.playDone(this)
         title.text = "Молодець!"
         hint.text = "Розминку зараховано. Таймер запущено знову."
         snooze.visibility = View.GONE
@@ -386,7 +386,7 @@ class ChallengeActivity : Activity(), SensorEventListener {
             setPadding(0, dp(20), 0, 0)
         }
         snooze = Button(this).apply {
-            text = "Відкласти на 10 хв (один раз)"
+            text = "Відкласти на 10 хв"
             visibility = if (store.pending && !store.snoozeUsed) View.VISIBLE else View.GONE
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -394,6 +394,7 @@ class ChallengeActivity : Activity(), SensorEventListener {
             ).apply { topMargin = dp(28) }
             setOnClickListener {
                 store.snoozeUsed = true
+                Sounds.playSnooze(this@ChallengeActivity)
                 Reminder.hideNotification(this@ChallengeActivity)
                 Reminder.scheduleNag(this@ChallengeActivity, 10)
                 finish()

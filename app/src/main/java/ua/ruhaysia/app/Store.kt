@@ -17,13 +17,28 @@ class Store(ctx: Context) {
         get() = sp.getInt("intervalMin", 60)
         set(v) = sp.edit().putInt("intervalMin", v).apply()
 
-    var startHour: Int
-        get() = sp.getInt("startHour", 9)
-        set(v) = sp.edit().putInt("startHour", v).apply()
+    /** Active hours as minutes from midnight, e.g. 8:30 is 510. */
+    var startMinutes: Int
+        get() = sp.getInt("startMinutes", sp.getInt("startHour", 9) * 60)
+        set(v) = sp.edit().putInt("startMinutes", v).apply()
 
-    var endHour: Int
-        get() = sp.getInt("endHour", 21)
-        set(v) = sp.edit().putInt("endHour", v).apply()
+    var endMinutes: Int
+        get() = sp.getInt("endMinutes", sp.getInt("endHour", 21) * 60)
+        set(v) = sp.edit().putInt("endMinutes", v).apply()
+
+    /** Voice phrase with the reminder; when off, the phone only vibrates. */
+    var remindSound: Boolean
+        get() = sp.getBoolean("remindSound", true)
+        set(v) = sp.edit().putBoolean("remindSound", v).apply()
+
+    /** Voice phrase after a finished warm-up and after snoozing. */
+    var appSound: Boolean
+        get() = sp.getBoolean("appSound", true)
+        set(v) = sp.edit().putBoolean("appSound", v).apply()
+
+    fun lastSound(kind: String): Int = sp.getInt("lastSound_$kind", -1)
+
+    fun setLastSound(kind: String, i: Int) = sp.edit().putInt("lastSound_$kind", i).apply()
 
     fun goal(ex: Ex): Int = sp.getInt(ex.key + "Goal", ex.defaultGoal)
 
@@ -49,16 +64,6 @@ class Store(ctx: Context) {
     var nextAt: Long
         get() = sp.getLong("nextAt", 0L)
         set(v) = sp.edit().putLong("nextAt", v).apply()
-
-    /** Grows on every sound change: a notification channel cannot change its sound. */
-    var soundVersion: Int
-        get() = sp.getInt("soundVersion", 0)
-        set(v) = sp.edit().putInt("soundVersion", v).apply()
-
-    fun soundName(kind: String): String? = sp.getString("soundName_$kind", null)
-
-    fun setSoundName(kind: String, name: String?) =
-        sp.edit().putString("soundName_$kind", name).apply()
 
     fun doneOn(day: Date): Int = sp.getInt("done_" + KEY.format(day), 0)
 
