@@ -35,7 +35,6 @@ import java.util.Locale
 class MainActivity : Activity() {
     private lateinit var store: Store
     private lateinit var status: TextView
-    private lateinit var stats: TextView
     private lateinit var toggle: Switch
     private lateinit var fixNotifications: Button
     private lateinit var fixFullScreen: Button
@@ -56,7 +55,9 @@ class MainActivity : Activity() {
         val now = System.currentTimeMillis()
         val sbStatus = StringBuilder(Reminder.statusText(this))
         sbStatus.append("\nСьогодні: ").append(store.doneOn(Date())).append(" з ")
-            .append(store.dailyGoal).append(" · серія: ").append(store.streak()).append(" дн.")
+            .append(store.dailyGoal)
+        val (goalDays, activeDays) = store.weekProgress()
+        sbStatus.append(" · тиждень: ").append(goalDays).append(" з ").append(activeDays).append(" дн.")
         if (store.lastSkipAt > 0L && now - store.lastSkipAt < 3 * 3600_000L) {
             sbStatus.append("\nОстаннє нагадування пропущено о ")
                 .append(SimpleDateFormat("HH:mm", Locale.US).format(Date(store.lastSkipAt)))
@@ -66,23 +67,6 @@ class MainActivity : Activity() {
         pauseButton.text = if (Reminder.isPaused(store)) "Зняти паузу" else "Пауза"
         pauseButton.isEnabled = store.enabled
         MoveWidget.refresh(this)
-
-        val uk = Locale("uk")
-        val dayFmt = SimpleDateFormat("EEE dd.MM", uk)
-        val sb = StringBuilder()
-        val c = Calendar.getInstance()
-        for (i in 0 until 7) {
-            val n = store.doneOn(c.time)
-            sb.append(if (i == 0) "Сьогодні" else dayFmt.format(c.time))
-                .append(" — розминок: ").append(n).append('\n')
-            val parts = Ex.values()
-                .map { it to store.amountOn(c.time, it) }
-                .filter { it.second > 0 }
-                .joinToString(" · ") { "${it.first.title.lowercase()} ${it.second}" }
-            if (parts.isNotEmpty()) sb.append("      ").append(parts).append('\n')
-            c.add(Calendar.DAY_OF_YEAR, -1)
-        }
-        stats.text = sb.toString().trimEnd()
 
         val nm = getSystemService(NotificationManager::class.java)
         fixNotifications.visibility =
@@ -338,6 +322,13 @@ class MainActivity : Activity() {
         root.addView(pauseButton)
 
         root.addView(Button(this).apply {
+            text = "Статистика"
+            setOnClickListener {
+                startActivity(Intent(this@MainActivity, StatsActivity::class.java))
+            }
+        })
+
+        root.addView(Button(this).apply {
             text = "Налаштування"
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
@@ -374,10 +365,6 @@ class MainActivity : Activity() {
             }
         }
         root.addView(fixFullScreen)
-
-        root.addView(label("Статистика за 7 днів", 18f, 28))
-        stats = label("", 15f, 8).apply { setLineSpacing(dp(4).toFloat(), 1f) }
-        root.addView(stats)
 
         setContentView(ScrollView(this).apply {
             fitsSystemWindows = true

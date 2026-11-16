@@ -12,7 +12,6 @@ object Sounds {
     val NAG = listOf("nag1", "nag2", "nag3")
 
     /** Played by the app itself. */
-    private val DONE = intArrayOf(R.raw.done1, R.raw.done2, R.raw.done3)
     private val SNOOZE = intArrayOf(R.raw.snooze1, R.raw.snooze2, R.raw.snooze3)
 
     private var player: MediaPlayer? = null
@@ -30,25 +29,35 @@ object Sounds {
         return i
     }
 
-    /** Extra phrases found by file name, e.g. goal1.mp3, done_squats2.mp3; may be empty. */
+    /** Phrases found by file name: done1.mp3, done2.mp3 and so on, in order. */
     private fun named(ctx: Context, prefix: String): List<Int> =
-        (1..9).map { ctx.resources.getIdentifier(prefix + it, "raw", ctx.packageName) }
+        (1..30).map { ctx.resources.getIdentifier(prefix + it, "raw", ctx.packageName) }
             .filter { it != 0 }
 
+    /** Phrase after an ordinary warm-up: a random one. */
+    fun playDone(ctx: Context) = playRandom(ctx, "done")
+
+    /** Phrase when the daily goal is reached: a random one. */
+    fun playGoal(ctx: Context) {
+        if (named(ctx, "goal").isEmpty()) playDone(ctx) else playRandom(ctx, "goal")
+    }
+
     /**
-     * Phrase after a finished warm-up. Most special one wins: [special] ("streak" or
-     * "goal"), then one for this exercise, then a general one.
+     * Phrase for a completed week. These go in a circle: week1, week2, week3, week1...
+     * [weekNumber] is 1 for the first completed week.
      */
-    fun playDone(ctx: Context, ex: Ex?, special: String?) {
-        val options = listOfNotNull(special, ex?.let { "done_" + it.key })
-        for (prefix in options) {
-            val ids = named(ctx, prefix)
-            if (ids.isNotEmpty()) {
-                play(ctx, ids[pick(ctx, prefix, ids.size)])
-                return
-            }
+    fun playWeek(ctx: Context, weekNumber: Int) {
+        val ids = named(ctx, "week")
+        if (ids.isEmpty()) {
+            playGoal(ctx)
+            return
         }
-        play(ctx, DONE[pick(ctx, "done", DONE.size)])
+        play(ctx, ids[(weekNumber - 1).coerceAtLeast(0) % ids.size])
+    }
+
+    private fun playRandom(ctx: Context, prefix: String) {
+        val ids = named(ctx, prefix)
+        if (ids.isNotEmpty()) play(ctx, ids[pick(ctx, prefix, ids.size)])
     }
 
     fun playSnooze(ctx: Context) = play(ctx, SNOOZE[pick(ctx, "snooze", SNOOZE.size)])

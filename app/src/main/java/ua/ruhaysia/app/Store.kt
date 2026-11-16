@@ -73,22 +73,58 @@ class Store(ctx: Context) {
         get() = sp.getLong("pauseUntil", 0L)
         set(v) = sp.edit().putLong("pauseUntil", v).apply()
 
-    /**
-     * Days in a row with the daily goal reached. Today counts once the goal is reached
-     * and does not break the streak before that; switched-off weekdays are ignored.
-     */
-    fun streak(): Int {
-        val goal = dailyGoal
+    /** Monday to Sunday of the current week. */
+    fun weekDays(): List<Date> {
         val c = Calendar.getInstance()
-        var n = 0
-        if (doneOn(c.time) >= goal) n++
-        for (i in 1..365) {
+        var guard = 0
+        while (c.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY && guard < 7) {
             c.add(Calendar.DAY_OF_YEAR, -1)
-            if (!dayOn(c.get(Calendar.DAY_OF_WEEK))) continue
-            if (doneOn(c.time) >= goal) n++ else break
+            guard++
         }
-        return n
+        return (0 until 7).map {
+            val d = c.time
+            c.add(Calendar.DAY_OF_YEAR, 1)
+            d
+        }
     }
+
+    private fun isOnDay(d: Date): Boolean =
+        dayOn(Calendar.getInstance().apply { time = d }.get(Calendar.DAY_OF_WEEK))
+
+    /** This week: days with the daily goal reached, out of switched-on weekdays. */
+    fun weekProgress(): Pair<Int, Int> {
+        val goal = dailyGoal
+        val days = weekDays().filter { isOnDay(it) }
+        return days.count { doneOn(it) >= goal } to days.size
+    }
+
+    /**
+     * True exactly once per week: today is the last switched-on day of the week and the
+     * daily goal has now been reached on every switched-on day.
+     */
+    fun claimWeekDone(): Boolean {
+        val days = weekDays().filter { isOnDay(it) }
+        if (days.isEmpty()) return false
+        if (KEY.format(days.last()) != KEY.format(Date())) return false
+        val goal = dailyGoal
+        if (days.any { doneOn(it) < goal }) return false
+        val weekKey = KEY.format(weekDays().first())
+        if (sp.getString("weekPraised", null) == weekKey) return false
+        sp.edit().putString("weekPraised", weekKey).apply()
+        return true
+    }
+
+    /** How many weeks were completed; also decides which "week" phrase is next. */
+    var weeksDone: Int
+        get() = sp.getInt("weeksDone", 0)
+        set(v) = sp.edit().putInt("weeksDone", v).apply()
+
+    fun totalDone(): Int =
+        sp.all.filter { it.key.startsWith("done_") }.values.sumOf { (it as? Int) ?: 0 }
+
+    fun totalAmount(ex: Ex): Int =
+        sp.all.filter { it.key.startsWith("ex_") && it.key.endsWith("_" + ex.key) }
+            .values.sumOf { (it as? Int) ?: 0 }
 
     /** The next alarm is a manual test: show it even if reminders are off or it is late. */
     var testOnce: Boolean

@@ -27,7 +27,8 @@ class MoveWidget : AppWidgetProvider() {
                 views.setTextViewText(R.id.w_line1, Reminder.statusText(app))
                 views.setTextViewText(
                     R.id.w_line2,
-                    "Сьогодні: ${s.doneOn(Date())} з ${s.dailyGoal} · серія: ${s.streak()} дн."
+                    "Сьогодні: ${s.doneOn(Date())} з ${s.dailyGoal} · тиждень: " +
+                        s.weekProgress().let { "${it.first} з ${it.second} дн." }
                 )
                 views.setOnClickPendingIntent(
                     R.id.w_root,

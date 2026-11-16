@@ -312,10 +312,10 @@ class ChallengeActivity : Activity(), SensorEventListener {
             bars[e]?.progress = minOf(n, goal)
             if (n >= goal && reached == null) reached = e
         }
-        if (!done && reached != null) complete(reached)
+        if (!done && reached != null) complete()
     }
 
-    private fun complete(ex: Ex) {
+    private fun complete() {
         done = true
         store.pending = false
         store.snoozeUsed = false
@@ -329,16 +329,23 @@ class ChallengeActivity : Activity(), SensorEventListener {
 
         val today = store.doneOn(Date())
         val goalHit = today == store.dailyGoal
-        val streak = store.streak()
-        val special = when {
-            goalHit && streak > 0 && streak % 7 == 0 -> "streak"
-            goalHit -> "goal"
-            else -> null
+        val weekHit = goalHit && store.claimWeekDone()
+        if (weekHit) {
+            store.weeksDone = store.weeksDone + 1
+            Sounds.playWeek(this, store.weeksDone)
+        } else if (goalHit) {
+            Sounds.playGoal(this)
+        } else {
+            Sounds.playDone(this)
         }
-        Sounds.playDone(this, ex, special)
-        title.text = if (goalHit) "Денну ціль виконано!" else "Молодець!"
-        hint.text = "Сьогодні: $today з ${store.dailyGoal}. Серія: $streak дн.\n" +
-            "Таймер запущено знову."
+        val (goalDays, activeDays) = store.weekProgress()
+        title.text = when {
+            weekHit -> "Тижневу ціль виконано!"
+            goalHit -> "Денну ціль виконано!"
+            else -> "Молодець!"
+        }
+        hint.text = "Сьогодні: $today з ${store.dailyGoal}. " +
+            "Тиждень: $goalDays з $activeDays днів.\nТаймер запущено знову."
         MoveWidget.refresh(this)
         snooze.visibility = View.GONE
         try {

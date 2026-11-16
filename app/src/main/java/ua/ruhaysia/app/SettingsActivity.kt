@@ -182,7 +182,8 @@ class SettingsActivity : Activity() {
         numberRow(root, "Скільки кроків досить", { store.skipSteps }) { store.skipSteps = it }
 
         root.addView(label("Денна ціль", 18f, 24))
-        root.addView(label("День іде в серію, якщо зроблено стільки розминок.", 14f, 4, true))
+        root.addView(label("День зараховано, якщо зроблено стільки розминок. Тиждень зараховано, " +
+            "якщо ціль виконано в кожен увімкнений день.", 14f, 4, true))
         numberRow(root, "Розминок на день", { store.dailyGoal }) { store.dailyGoal = it }
 
         root.addView(label("Перевірка", 18f, 24))
