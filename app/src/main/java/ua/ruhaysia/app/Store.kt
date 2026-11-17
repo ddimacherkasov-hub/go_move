@@ -37,6 +37,11 @@ class Store(ctx: Context) {
         get() = sp.getBoolean("remindSound", true)
         set(v) = sp.edit().putBoolean("remindSound", v).apply()
 
+    /** Open the warm-up screen over other apps (needs the "display over apps" permission). */
+    var popupOver: Boolean
+        get() = sp.getBoolean("popupOver", true)
+        set(v) = sp.edit().putBoolean("popupOver", v).apply()
+
     /** Voice phrase after a finished warm-up and after snoozing. */
     var appSound: Boolean
         get() = sp.getBoolean("appSound", true)

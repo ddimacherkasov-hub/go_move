@@ -28,6 +28,7 @@ class SettingsActivity : Activity() {
     private lateinit var store: Store
     private lateinit var batteryText: TextView
     private lateinit var batteryButton: Button
+    private lateinit var overlayButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(themeRes())
@@ -43,6 +44,10 @@ class SettingsActivity : Activity() {
         batteryText.text =
             if (free) "Обмеження батареї знято, застосунок може працювати у фоні."
             else "Телефон може зупиняти застосунок у фоні, і нагадування не прийдуть."
+        val over = Reminder.canPopup(this)
+        overlayButton.isEnabled = !over
+        overlayButton.alpha = if (over) 0.5f else 1f
+        overlayButton.text = if (over) "Дозвіл уже надано" else "Дозволити показ поверх застосунків"
         batteryButton.isEnabled = !free
         batteryButton.alpha = if (free) 0.5f else 1f
         batteryButton.text = if (free) "Обмеження вже знято" else "Зняти обмеження батареї"
@@ -139,7 +144,8 @@ class SettingsActivity : Activity() {
         root.addView(label("Налаштування", 28f).apply { setTextColor(accent()) })
 
         root.addView(label("Звуки", 18f, 24))
-        root.addView(label("Якщо вимкнути голос нагадування, телефон лише вібруватиме.", 14f, 4, true))
+        root.addView(label("Голос нагадування грає на гучності будильника, тож його чути навіть " +
+            "у беззвучному режимі. Якщо вимкнути, телефон лише вібруватиме.", 14f, 4, true))
         switchRow(root, "Голос нагадування", store.remindSound) { store.remindSound = it }
         switchRow(root, "Голос після вправи й відкладення", store.appSound) { store.appSound = it }
 
@@ -223,6 +229,34 @@ class SettingsActivity : Activity() {
                 ).show()
             }
         })
+
+        root.addView(label("Поверх інших застосунків", 18f, 24))
+        root.addView(label("Коли ти дивишся відео чи сидиш в іншому застосунку, Android " +
+            "показує нагадування лише маленькою плашкою. З цим дозволом розминка " +
+            "відкриватиметься на весь екран.", 14f, 4, true))
+        switchRow(root, "Відкривати розминку на весь екран", store.popupOver) {
+            store.popupOver = it
+        }
+        overlayButton = Button(this).apply {
+            setOnClickListener {
+                try {
+                    startActivity(
+                        Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:$packageName")
+                        )
+                    )
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        this@SettingsActivity,
+                        "Відкрий налаштування телефона → Застосунки → Jaba Mover → " +
+                            "Показ поверх інших застосунків",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+        root.addView(overlayButton)
 
         root.addView(label("Робота у фоні", 18f, 24))
         batteryText = label("", 14f, 4, true)

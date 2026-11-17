@@ -40,6 +40,7 @@ class MainActivity : Activity() {
     private lateinit var toggle: Switch
     private lateinit var fixNotifications: Button
     private lateinit var fixFullScreen: Button
+    private lateinit var fixOverlay: Button
     private lateinit var pauseButton: Button
     private lateinit var startButton: Button
     private var shownTheme = THEME_GREEN
@@ -106,6 +107,8 @@ class MainActivity : Activity() {
         pauseButton.alpha = if (store.enabled) 1f else 0.5f
         if (withWidget) MoveWidget.refresh(this)
 
+        fixOverlay.visibility =
+            if (store.popupOver && !Reminder.canPopup(this)) View.VISIBLE else View.GONE
         val nm = getSystemService(NotificationManager::class.java)
         fixNotifications.visibility =
             if (nm.areNotificationsEnabled()) View.GONE else View.VISIBLE
@@ -322,6 +325,23 @@ class MainActivity : Activity() {
                 startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
             }
         })
+
+        fixOverlay = Button(this).apply {
+            text = "Дозволити показ на весь екран поверх відео"
+            visibility = View.GONE
+            setOnClickListener {
+                try {
+                    startActivity(
+                        Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:$packageName")
+                        )
+                    )
+                } catch (ignored: Exception) {
+                }
+            }
+        }
+        root.addView(fixOverlay)
 
         fixNotifications = Button(this).apply {
             text = "Увімкнути сповіщення (вимкнені)"

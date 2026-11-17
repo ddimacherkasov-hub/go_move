@@ -16,10 +16,14 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.media.AudioAttributes
-import android.net.Uri
+import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -69,7 +73,7 @@ object Steps {
 /** Scheduling of reminders and the "time to move" notification. */
 object Reminder {
     const val ACTION_REMIND = "ua.ruhaysia.app.REMIND"
-    private const val CHANNEL_PREFIX = "mv3_"
+    private const val CHANNEL_PREFIX = "mv4_"
     private const val NOTIF_ID = 1
     private const val NAG_MINUTES = 5
 
@@ -314,24 +318,71 @@ object Reminder {
                     s.lastSkipAt = now
                     s.lastSkipSteps = (cur - base).toInt()
                     scheduleNext(ctx, cur)
+                    then()
                 } else {
-                    remind(ctx, false)
+                    remind(ctx, false, then)
                 }
-                then()
             }
             return
         }
-        remind(ctx, nag)
-        then()
+        remind(ctx, nag, then)
     }
 
-    private fun remind(ctx: Context, nag: Boolean) {
+    private fun remind(ctx: Context, nag: Boolean, then: () -> Unit) {
         val s = Store(ctx)
         s.pending = true
         s.snoozeUntil = 0L
         showNotification(ctx, nag)
         scheduleNag(ctx)
         MoveWidget.refresh(ctx)
+        openOverEverything(ctx)
+        Sounds.playReminder(ctx, nag, then)
+    }
+
+    fun canPopup(ctx: Context): Boolean = Settings.canDrawOverlays(ctx)
+
+    /**
+     * When the phone is in use, Android shows a reminder only as a small banner.
+     * With the "display over other apps" permission the warm-up screen is opened directly,
+     * on top of a video or any other app. Newer Android versions allow that only while
+     * the app has a window on screen, so a tiny invisible one is shown for a moment.
+     */
+    private fun openOverEverything(ctx: Context) {
+        val app = ctx.applicationContext
+        if (!Store(app).popupOver || !canPopup(app)) return
+        val wm = app.getSystemService(WindowManager::class.java)
+        var dot: View? = null
+        try {
+            val v = View(app)
+            val lp = WindowManager.LayoutParams(
+                1, 1,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                PixelFormat.TRANSLUCENT
+            )
+            lp.gravity = Gravity.TOP or Gravity.START
+            wm.addView(v, lp)
+            dot = v
+        } catch (ignored: Exception) {
+        }
+        try {
+            app.startActivity(
+                Intent(app, ChallengeActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            )
+        } catch (ignored: Exception) {
+        }
+        val shown = dot
+        if (shown != null) {
+            Handler(Looper.getMainLooper()).postDelayed({
+                try {
+                    wm.removeView(shown)
+                } catch (ignored: Exception) {
+                }
+            }, 3000L)
+        }
     }
 
     /** After reboot or app update alarms are lost, so set them again. */
@@ -349,30 +400,25 @@ object Reminder {
         }
     }
 
-    private fun channel(id: String, name: String, sound: Uri?): NotificationChannel =
-        NotificationChannel(id, name, NotificationManager.IMPORTANCE_HIGH).apply {
-            description = "Сигнал, що час встати з-за комп'ютера"
-            enableVibration(true)
-            vibrationPattern = longArrayOf(0, 400, 200, 400, 200, 400)
-            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            setSound(
-                sound,
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
-            )
-        }
-
     /**
-     * A channel's sound cannot be changed later, so every phrase has its own channel,
-     * plus one silent channel that only vibrates.
+     * The reminder notification itself is silent and only vibrates: the voice phrase is
+     * played by the app on the alarm volume (see Sounds.playReminder).
      */
     private fun ensureChannels(ctx: Context, nm: NotificationManager) {
         for (old in nm.notificationChannels) {
             if (!old.id.startsWith(CHANNEL_PREFIX)) nm.deleteNotificationChannel(old.id)
         }
-        nm.createNotificationChannel(channel(CHANNEL_PREFIX + "vibro", "Тільки вібрація", null))
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_PREFIX + "remind", "Нагадування рухатись", NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Сигнал, що час встати з-за комп'ютера"
+                setSound(null, null)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 400, 200, 400, 200, 400)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
+        )
         nm.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_PREFIX + "snooze", "Відкладена розминка", NotificationManager.IMPORTANCE_LOW
@@ -383,27 +429,13 @@ object Reminder {
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
         )
-        Sounds.REMIND.forEachIndexed { i, n ->
-            nm.createNotificationChannel(
-                channel(CHANNEL_PREFIX + n, "Нагадування, фраза ${i + 1}", Sounds.uri(ctx, n))
-            )
-        }
-        Sounds.NAG.forEachIndexed { i, n ->
-            nm.createNotificationChannel(
-                channel(CHANNEL_PREFIX + n, "Повторне нагадування, фраза ${i + 1}", Sounds.uri(ctx, n))
-            )
-        }
     }
 
     private fun showNotification(ctx: Context, nag: Boolean) {
         val s = Store(ctx)
         val nm = ctx.getSystemService(NotificationManager::class.java)
         ensureChannels(ctx, nm)
-        val channelId = CHANNEL_PREFIX + when {
-            !s.remindSound -> "vibro"
-            nag -> Sounds.NAG[Sounds.pick(ctx, "nag", Sounds.NAG.size)]
-            else -> Sounds.REMIND[Sounds.pick(ctx, "remind", Sounds.REMIND.size)]
-        }
+        val channelId = CHANNEL_PREFIX + "remind"
 
         val open = PendingIntent.getActivity(
             ctx, 1,
